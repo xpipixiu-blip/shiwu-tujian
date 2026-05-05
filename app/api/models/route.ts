@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 const BASE_URL = process.env.SJTU_BASE_URL ?? "https://models.sjtu.edu.cn/api/v1";
 const API_KEY = process.env.SJTU_API_KEY;
 
