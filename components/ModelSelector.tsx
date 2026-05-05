@@ -17,6 +17,7 @@ export default function ModelSelector({ value, onChange, disabled }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [manualId, setManualId] = useState("");
   const [showManual, setShowManual] = useState(false);
+  const [autoSelected, setAutoSelected] = useState(false);
 
   const fetchModels = useCallback(async () => {
     setIsLoading(true);
@@ -26,44 +27,52 @@ export default function ModelSelector({ value, onChange, disabled }: Props) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to fetch");
       setModels(data.models ?? []);
-      // Auto-select first if no saved value
-      if (!value && data.models?.length > 0) {
-        onChange(data.models[0].id);
-      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setIsLoading(false);
     }
-  }, [value, onChange]);
+  }, []);
 
   // Fetch once on mount
   useEffect(() => {
     fetchModels();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchModels]);
 
-  // Restore saved modelId on mount
+  // Auto-select model once list is loaded
   useEffect(() => {
+    if (autoSelected || models.length === 0) return;
+
     const saved = loadModelId();
-    if (saved && !value) {
+    if (saved && models.some((m) => m.id === saved)) {
       onChange(saved);
+    } else {
+      onChange(models[0].id);
+      saveModelId(models[0].id);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    setAutoSelected(true);
+  }, [models, autoSelected, onChange]);
 
   const handleChange = (id: string) => {
+    if (id === "__manual__") {
+      setShowManual(true);
+      return;
+    }
     onChange(id);
     saveModelId(id);
   };
 
   const handleManualSubmit = () => {
     if (manualId.trim()) {
-      handleChange(manualId.trim());
+      onChange(manualId.trim());
+      saveModelId(manualId.trim());
       setManualId("");
       setShowManual(false);
     }
   };
+
+  // Show current model even without auto-select
+  const hasModel = value !== "";
 
   return (
     <div className="space-y-2">
@@ -87,7 +96,6 @@ export default function ModelSelector({ value, onChange, disabled }: Props) {
               重试
             </button>
           </div>
-          {/* Fallback: manual input */}
           {!showManual ? (
             <button
               onClick={() => setShowManual(true)}
@@ -118,35 +126,45 @@ export default function ModelSelector({ value, onChange, disabled }: Props) {
           )}
         </div>
       ) : models.length > 0 ? (
-        <select
-          value={value}
-          onChange={(e) => handleChange(e.target.value)}
-          disabled={disabled}
-          className="w-full px-3 py-2 bg-stone-800/80 border border-stone-700 rounded-lg text-sm text-stone-200 focus:outline-none focus:border-amber-600 disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2378716c' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-            backgroundPosition: "right 0.5rem center",
-            backgroundRepeat: "no-repeat",
-            backgroundSize: "1.5em 1.5em",
-            paddingRight: "2.5rem",
-          }}
-        >
-          {models.map((m) => (
-            <option key={m.id} value={m.id} className="bg-stone-900 text-stone-200">
-              {m.id}
-              {m.owned_by ? ` (${m.owned_by})` : ""}
+        <>
+          <select
+            value={hasModel ? value : ""}
+            onChange={(e) => handleChange(e.target.value)}
+            disabled={disabled}
+            className="w-full px-3 py-2 bg-stone-800/80 border border-stone-700 rounded-lg text-sm text-stone-200 focus:outline-none focus:border-amber-600 disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2378716c' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+              backgroundPosition: "right 0.5rem center",
+              backgroundRepeat: "no-repeat",
+              backgroundSize: "1.5em 1.5em",
+              paddingRight: "2.5rem",
+            }}
+          >
+            {!hasModel && (
+              <option value="" disabled className="bg-stone-900 text-stone-500">
+                请选择模型...
+              </option>
+            )}
+            {models.map((m) => (
+              <option key={m.id} value={m.id} className="bg-stone-900 text-stone-200">
+                {m.id}
+                {m.owned_by ? ` (${m.owned_by})` : ""}
+              </option>
+            ))}
+            <option value="__manual__" className="bg-stone-900 text-stone-400">
+              + 手动输入...
             </option>
-          ))}
-          <option value="__manual__" className="bg-stone-900 text-stone-400">
-            + 手动输入...
-          </option>
-        </select>
+          </select>
+          {!hasModel && (
+            <p className="text-[10px] text-amber-500/80">请在下拉框中选择一个模型</p>
+          )}
+        </>
       ) : (
         <p className="text-xs text-stone-600">无可用模型</p>
       )}
 
       {/* Handle "manual input" selection from dropdown */}
-      {value === "__manual__" && (
+      {showManual && (
         <div className="flex gap-2 mt-2">
           <input
             type="text"

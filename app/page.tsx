@@ -405,6 +405,15 @@ export default function HomePage() {
               )}
             </button>
 
+            {/* Requirement checklist */}
+            {!canGenerate && (city || imageFile || modelId) && (
+              <div className="text-center text-[10px] text-stone-500 space-y-0.5">
+                {!modelId && <p>⬩ 请选择模型</p>}
+                {!city && <p>⬩ 请选择风格来源</p>}
+                {!imageFile && <p>⬩ 请上传照片</p>}
+              </div>
+            )}
+
             {/* Error display */}
             {generateError && (
               <div className="p-3 rounded-lg border border-red-900/50 bg-red-900/20 text-center">
@@ -415,7 +424,7 @@ export default function HomePage() {
               </div>
             )}
 
-            {!city && !imageFile && (
+            {!city && !imageFile && !modelId && (
               <p className="text-center text-xs text-stone-600">
                 选择模型和风格来源，上传照片，AI 将为你生成识物图鉴卡片
               </p>
