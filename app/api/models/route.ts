@@ -2,20 +2,27 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const BASE_URL = process.env.SJTU_BASE_URL ?? "https://models.sjtu.edu.cn/api/v1";
-const API_KEY = process.env.SJTU_API_KEY;
+export async function POST(request: Request) {
+  const body = await request.json().catch(() => ({}));
+  const userApiKey = (body as Record<string, string>).userApiKey;
+  const userBaseUrl = (body as Record<string, string>).userBaseUrl;
 
-export async function GET() {
-  if (!API_KEY) {
+  const key = userApiKey || process.env.SJTU_API_KEY;
+  const baseUrl = userBaseUrl || process.env.SJTU_BASE_URL || "https://models.sjtu.edu.cn/api/v1";
+
+  if (!key) {
     return NextResponse.json(
-      { error: "SJTU_API_KEY is not configured on the server." },
+      {
+        error: "API key not configured.",
+        hint: "站点默认模型暂不可用，你可以在 API 设置中填写自己的 API Key 继续使用",
+      },
       { status: 500 }
     );
   }
 
   try {
-    const res = await fetch(`${BASE_URL}/models`, {
-      headers: { Authorization: `Bearer ${API_KEY}` },
+    const res = await fetch(`${baseUrl}/models`, {
+      headers: { Authorization: `Bearer ${key}` },
       signal: AbortSignal.timeout(10_000),
     });
 
@@ -27,8 +34,6 @@ export async function GET() {
     }
 
     const data = await res.json();
-
-    // Normalize: expect { data: [{ id, owned_by? }] } (OpenAI format) or { models: [...] }
     const rawList = data.data ?? data.models ?? data;
     const models = Array.isArray(rawList)
       ? rawList.map((m: { id?: string; owned_by?: string }) => ({

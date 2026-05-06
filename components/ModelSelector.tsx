@@ -9,9 +9,11 @@ type Props = {
   value: string;
   onChange: (modelId: string) => void;
   disabled?: boolean;
+  showByokOverride?: boolean;
+  byokModelId?: string;
 };
 
-export default function ModelSelector({ value, onChange, disabled }: Props) {
+export default function ModelSelector({ value, onChange, disabled, showByokOverride, byokModelId }: Props) {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +81,14 @@ export default function ModelSelector({ value, onChange, disabled }: Props) {
       <h2 className="text-sm font-medium text-stone-400 uppercase tracking-widest">
         模型选择
       </h2>
+
+      {showByokOverride && (
+        <div className="px-3 py-2 bg-emerald-900/20 border border-emerald-800/40 rounded-lg text-xs text-emerald-400/80">
+          使用自定义模型：<span className="font-medium text-emerald-300">{byokModelId || "(未设置)"}</span>
+          <br />
+          <span className="text-stone-500">在 ⚙ API 设置中修改</span>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center gap-2 px-3 py-2 bg-stone-800/80 border border-stone-700 rounded-lg">
