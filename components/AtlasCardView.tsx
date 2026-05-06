@@ -164,8 +164,7 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
 
           {/* 2. Name row */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%", marginBottom: 4 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
-              {catEmoji && <EmojiSpan emoji={catEmoji} size={16} />}
+            <div style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
               <h2 style={{ minWidth: 0, fontSize: 22, fontWeight: t.nameWeight, letterSpacing: isLiquid ? "0.12em" : "0.08em", lineHeight: 1.3, color: t.nameColor, fontFamily: t.nameFont }}>
                 {card.fantasyName}
               </h2>
@@ -202,11 +201,7 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
           </div>
 
           {/* 5. Fun fact */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10 }}>
-            <div style={{ flex: 1, height: 1, background: t.dividerColor }} />
-            {catEmoji && <EmojiSpan emoji={catEmoji} size={11} />}
-            <div style={{ flex: 1, height: 1, background: t.dividerColor }} />
-          </div>
+          <div className="w-full h-px mb-2.5" style={{ background: t.dividerColor }} />
           <p className="text-[12px] leading-relaxed" style={{ color: t.funColor }}>{card.funFact}</p>
         </div>
 
