@@ -3,6 +3,8 @@
 import { useState, useCallback } from "react";
 import type { ByokConfig } from "@/lib/byok-storage";
 
+type ModelInfo = { id: string; owned_by?: string };
+
 type Props = {
   isOpen: boolean;
   onClose: () => void;
@@ -28,11 +30,42 @@ export default function ApiSettingsPanel({
   const [modelId, setModelId] = useState(initialConfig?.modelId ?? "");
   const [remember, setRemember] = useState(false);
   const [showKey, setShowKey] = useState(false);
+
+  // Test connection
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{
-    ok: boolean;
-    msg: string;
-  } | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  // Fetch models for BYOK
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [byokModels, setByokModels] = useState<ModelInfo[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const handleFetchModels = useCallback(async () => {
+    if (!apiKey.trim()) return;
+    setFetchingModels(true);
+    setFetchError(null);
+    setByokModels([]);
+    try {
+      const res = await fetch("/api/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userApiKey: apiKey.trim(),
+          userBaseUrl: baseUrl.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? data.hint ?? "获取失败");
+      setByokModels(data.models ?? []);
+      if (data.models?.length > 0 && !modelId) {
+        setModelId(data.models[0].id);
+      }
+    } catch (e) {
+      setFetchError((e as Error).message);
+    } finally {
+      setFetchingModels(false);
+    }
+  }, [apiKey, baseUrl, modelId]);
 
   const handleTest = useCallback(async () => {
     if (!apiKey.trim() || !modelId.trim()) return;
@@ -67,12 +100,7 @@ export default function ApiSettingsPanel({
       return;
     }
     onSave(
-      {
-        enabled: true,
-        baseUrl: baseUrl.trim(),
-        apiKey: apiKey.trim(),
-        modelId: modelId.trim(),
-      },
+      { enabled: true, baseUrl: baseUrl.trim(), apiKey: apiKey.trim(), modelId: modelId.trim() },
       remember
     );
     onClose();
@@ -83,6 +111,8 @@ export default function ApiSettingsPanel({
     setModelId("");
     setBaseUrl("https://models.sjtu.edu.cn/api/v1");
     setTestResult(null);
+    setByokModels([]);
+    setFetchError(null);
     onClear();
     onClose();
   }, [onClear, onClose]);
@@ -107,21 +137,11 @@ export default function ApiSettingsPanel({
         {/* Mode toggle */}
         <div className="space-y-2 mb-4">
           <label className="flex items-center gap-2 text-sm text-stone-300 cursor-pointer">
-            <input
-              type="radio"
-              checked={mode === "default"}
-              onChange={() => setMode("default")}
-              className="accent-amber-600"
-            />
+            <input type="radio" checked={mode === "default"} onChange={() => setMode("default")} className="accent-amber-600" />
             使用站点默认配置
           </label>
           <label className="flex items-center gap-2 text-sm text-stone-300 cursor-pointer">
-            <input
-              type="radio"
-              checked={mode === "byok"}
-              onChange={() => setMode("byok")}
-              className="accent-amber-600"
-            />
+            <input type="radio" checked={mode === "byok"} onChange={() => setMode("byok")} className="accent-amber-600" />
             使用我自己的 API Key
           </label>
         </div>
@@ -131,52 +151,74 @@ export default function ApiSettingsPanel({
           <div className="space-y-3 mb-4">
             <div>
               <label className="text-[11px] text-stone-400 block mb-1">API Base URL</label>
-              <input
-                type="text"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
+              <input type="text" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)}
                 placeholder="https://models.sjtu.edu.cn/api/v1"
-                className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-sm text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-600"
-              />
+                className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-sm text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-600" />
             </div>
-
             <div>
               <label className="text-[11px] text-stone-400 block mb-1">API Key</label>
               <div className="flex gap-2">
-                <input
-                  type={showKey ? "text" : "password"}
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
+                <input type={showKey ? "text" : "password"} value={apiKey} onChange={(e) => setApiKey(e.target.value)}
                   placeholder="sk-..."
-                  className="flex-1 px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-sm text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-600"
-                />
-                <button
-                  onClick={() => setShowKey(!showKey)}
-                  className="px-3 py-2 text-xs text-stone-400 border border-stone-700 rounded-lg hover:text-stone-300"
-                >
+                  className="flex-1 px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-sm text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-600" />
+                <button onClick={() => setShowKey(!showKey)}
+                  className="px-3 py-2 text-xs text-stone-400 border border-stone-700 rounded-lg hover:text-stone-300">
                   {showKey ? "隐藏" : "显示"}
                 </button>
               </div>
             </div>
 
-            <div>
-              <label className="text-[11px] text-stone-400 block mb-1">Model ID</label>
-              <input
-                type="text"
-                value={modelId}
-                onChange={(e) => setModelId(e.target.value)}
-                placeholder="输入 model id"
-                className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-sm text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-600"
-              />
-            </div>
+            {/* Fetch models button */}
+            <button
+              onClick={handleFetchModels}
+              disabled={fetchingModels || !apiKey.trim()}
+              className="w-full py-2 rounded-lg text-xs font-medium border border-stone-600 text-stone-300 hover:border-amber-700/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {fetchingModels ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="inline-block w-3 h-3 border border-stone-500 border-t-amber-500 rounded-full animate-spin" />
+                  获取中...
+                </span>
+              ) : (
+                "📋 拉取模型列表"
+              )}
+            </button>
+
+            {/* BYOK model list */}
+            {byokModels.length > 0 && (
+              <div>
+                <label className="text-[11px] text-stone-400 block mb-1">Model ID</label>
+                <select value={modelId} onChange={(e) => setModelId(e.target.value)}
+                  className="w-full px-3 py-2 bg-stone-800/80 border border-stone-700 rounded-lg text-sm text-stone-200 focus:outline-none focus:border-amber-600 appearance-none cursor-pointer"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2378716c' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                    backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em", paddingRight: "2.5rem",
+                  }}>
+                  {byokModels.map((m) => (
+                    <option key={m.id} value={m.id} className="bg-stone-900 text-stone-200">
+                      {m.id}{m.owned_by ? ` (${m.owned_by})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {fetchError && (
+              <p className="text-xs text-amber-400/80">{fetchError}</p>
+            )}
+
+            {/* Manual model ID fallback */}
+            {!byokModels.length && !fetchingModels && (
+              <div>
+                <label className="text-[11px] text-stone-400 block mb-1">Model ID（手动输入）</label>
+                <input type="text" value={modelId} onChange={(e) => setModelId(e.target.value)}
+                  placeholder="输入 model id"
+                  className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-sm text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-600" />
+              </div>
+            )}
 
             <label className="flex items-center gap-2 text-xs text-stone-400 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-                className="accent-amber-600"
-              />
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-amber-600" />
               记住我的 Key（保存到本设备）
             </label>
           </div>
@@ -184,13 +226,7 @@ export default function ApiSettingsPanel({
 
         {/* Test result */}
         {testResult && (
-          <div
-            className={`mb-4 px-3 py-2 rounded-lg text-xs ${
-              testResult.ok
-                ? "bg-emerald-900/30 border border-emerald-800/50 text-emerald-400"
-                : "bg-red-900/30 border border-red-800/50 text-red-400"
-            }`}
-          >
+          <div className={`mb-4 px-3 py-2 rounded-lg text-xs ${testResult.ok ? "bg-emerald-900/30 border border-emerald-800/50 text-emerald-400" : "bg-red-900/30 border border-red-800/50 text-red-400"}`}>
             {testResult.msg}
           </div>
         )}
@@ -198,38 +234,29 @@ export default function ApiSettingsPanel({
         {/* Actions */}
         <div className="space-y-2">
           {mode === "byok" && (
-            <button
-              onClick={handleTest}
+            <button onClick={handleTest}
               disabled={testing || !apiKey.trim() || !modelId.trim()}
-              className="w-full py-2.5 rounded-lg text-sm font-medium border border-stone-600 text-stone-300 hover:border-amber-700/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+              className="w-full py-2.5 rounded-lg text-sm font-medium border border-stone-600 text-stone-300 hover:border-amber-700/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               {testing ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="inline-block w-3 h-3 border border-stone-500 border-t-amber-500 rounded-full animate-spin" />
                   测试中...
                 </span>
-              ) : (
-                "🔌 测试连接"
-              )}
+              ) : ("🔌 测试连接")}
             </button>
           )}
           <div className="flex gap-2">
-            <button
-              onClick={handleSave}
-              className="flex-1 py-2.5 rounded-lg text-sm font-medium bg-amber-800/80 text-amber-100 border border-amber-700 transition-colors hover:bg-amber-800"
-            >
+            <button onClick={handleSave}
+              className="flex-1 py-2.5 rounded-lg text-sm font-medium bg-amber-800/80 text-amber-100 border border-amber-700 transition-colors hover:bg-amber-800">
               保存设置
             </button>
-            <button
-              onClick={handleClear}
-              className="py-2.5 px-4 rounded-lg text-sm font-medium border border-red-900/50 text-red-400/80 hover:bg-red-900/20 transition-colors"
-            >
+            <button onClick={handleClear}
+              className="py-2.5 px-4 rounded-lg text-sm font-medium border border-red-900/50 text-red-400/80 hover:bg-red-900/20 transition-colors">
               清除
             </button>
           </div>
         </div>
 
-        {/* Note */}
         <p className="text-[10px] text-stone-600 mt-3 text-center">
           默认不保存 Key。勾选"记住"后保存到本设备 localStorage。
         </p>
