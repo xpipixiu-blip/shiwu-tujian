@@ -3,132 +3,68 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { toBlob, toPng } from "html-to-image";
 import type { AtlasCard as AtlasCardType, NumericStat, TextStat, CardPreset } from "@/lib/types";
+import { CategoryIcon, GameStar, EncycLeaf, EncycFlower } from "@/lib/card-icons";
 
 type Props = { card: AtlasCardType; onEdit: () => void; onClose?: () => void };
 
 /* ── Theme system ────────────────────────────────────────── */
 
 type Theme = {
-  bg: string;              // card background
-  bgHex: string;           // bg as hex (for toBlob)
-  nameColor: string;
-  nameFont: string;
+  bg: string; bgHex: string;
+  nameColor: string; nameFont: string; nameWeight: number;
   descColor: string;
-  dividerColor: string;
-  funColor: string;
-  statLabelColor: string;
-  statValueColor: string;
-  statBarTrack: string;
-  statBarHigh: string;
-  statBarMid: string;
-  statBarLow: string;
-  statBarMin: string;
-  badgeColor: string;
-  badgeBg: string;
-  badgeBorder: string;
-  badgeRadius: number;
-  imageBorder: string;
-  cardBorder: string;
-  cardOutline: string;
-  cardShadow: string;
+  dividerColor: string; funColor: string;
+  statLabelColor: string; statValueColor: string;
+  statBarTrack: string; statBarHigh: string; statBarMid: string; statBarLow: string; statBarMin: string;
+  badgeColor: string; badgeBg: string; badgeBorder: string; badgeRadius: number;
+  imageBorder: string; imageInset: string;
+  cardBorder: string; cardOutline: string; cardOutlineOffset: number; cardShadow: string;
 };
 
 const THEMES: Record<CardPreset, Theme> = {
   antique: {
-    bg: "#17130f",
-    bgHex: "#17130f",
-    nameColor: "#c7aa67",
-    nameFont: "var(--font-display), serif",
+    bg: "#17130f", bgHex: "#17130f",
+    nameColor: "#c7aa67", nameFont: "var(--font-display), serif", nameWeight: 700,
     descColor: "#c8b88a",
-    dividerColor: "rgba(185,154,91,0.15)",
-    funColor: "#7a7268",
-    statLabelColor: "#8b8076",
-    statValueColor: "rgba(199,170,103,0.8)",
-    statBarTrack: "#1e1a15",
-    statBarHigh: "#d3bd82",
-    statBarMid: "#c7aa67",
-    statBarLow: "#b99a5b",
-    statBarMin: "#8b6914",
-    badgeColor: "#b99a5b",
-    badgeBg: "rgba(185,154,91,0.08)",
-    badgeBorder: "rgba(185,154,91,0.2)",
-    badgeRadius: 3,
-    imageBorder: "rgba(185,154,91,0.3)",
-    cardBorder: "rgba(185,154,91,0.5)",
-    cardOutline: "rgba(185,154,91,0.12)",
-    cardShadow: "none",
+    dividerColor: "rgba(185,154,91,0.15)", funColor: "#7a7268",
+    statLabelColor: "#8b8076", statValueColor: "rgba(199,170,103,0.8)",
+    statBarTrack: "#1e1a15", statBarHigh: "#d3bd82", statBarMid: "#c7aa67", statBarLow: "#b99a5b", statBarMin: "#8b6914",
+    badgeColor: "#b99a5b", badgeBg: "rgba(185,154,91,0.08)", badgeBorder: "rgba(185,154,91,0.2)", badgeRadius: 3,
+    imageBorder: "rgba(185,154,91,0.3)", imageInset: "none",
+    cardBorder: "rgba(185,154,91,0.5)", cardOutline: "rgba(185,154,91,0.12)", cardOutlineOffset: 2, cardShadow: "none",
   },
   game: {
-    bg: "linear-gradient(180deg, #0d1117 0%, #111820 100%)",
-    bgHex: "#0d1117",
-    nameColor: "#8bc29a",
-    nameFont: "system-ui, -apple-system, sans-serif",
+    bg: "linear-gradient(180deg, #0d1117 0%, #111820 100%)", bgHex: "#0d1117",
+    nameColor: "#8bc29a", nameFont: "system-ui, -apple-system, sans-serif", nameWeight: 700,
     descColor: "#b8c5c8",
-    dividerColor: "rgba(139,194,154,0.2)",
-    funColor: "#6b7c80",
-    statLabelColor: "#7a8c90",
-    statValueColor: "rgba(139,194,154,0.9)",
-    statBarTrack: "#1a2428",
-    statBarHigh: "#8bc29a",
-    statBarMid: "#6ba87a",
-    statBarLow: "#4a8a5a",
-    statBarMin: "#3a6a4a",
-    badgeColor: "#8bc29a",
-    badgeBg: "rgba(139,194,154,0.1)",
-    badgeBorder: "rgba(139,194,154,0.25)",
-    badgeRadius: 8,
-    imageBorder: "rgba(139,194,154,0.25)",
-    cardBorder: "rgba(139,194,154,0.4)",
-    cardOutline: "rgba(139,194,154,0.08)",
-    cardShadow: "0 0 12px rgba(139,194,154,0.06)",
+    dividerColor: "rgba(139,194,154,0.2)", funColor: "#6b7c80",
+    statLabelColor: "#7a8c90", statValueColor: "rgba(139,194,154,0.9)",
+    statBarTrack: "#1a2428", statBarHigh: "#8bc29a", statBarMid: "#6ba87a", statBarLow: "#4a8a5a", statBarMin: "#3a6a4a",
+    badgeColor: "#8bc29a", badgeBg: "rgba(139,194,154,0.1)", badgeBorder: "rgba(139,194,154,0.25)", badgeRadius: 8,
+    imageBorder: "rgba(139,194,154,0.25)", imageInset: "none",
+    cardBorder: "rgba(139,194,154,0.4)", cardOutline: "rgba(139,194,154,0.08)", cardOutlineOffset: 2, cardShadow: "0 0 12px rgba(139,194,154,0.06)",
   },
   "liquid-metal": {
-    bg: "linear-gradient(180deg, #1a1c1e 0%, #1f2225 100%)",
-    bgHex: "#1a1c1e",
-    nameColor: "#d0d4d8",
-    nameFont: "system-ui, -apple-system, sans-serif",
-    descColor: "#9ca3a8",
-    dividerColor: "rgba(180,185,190,0.12)",
-    funColor: "#6b7280",
-    statLabelColor: "#8b9095",
-    statValueColor: "rgba(200,205,210,0.85)",
-    statBarTrack: "#262a2e",
-    statBarHigh: "#c8cdd2",
-    statBarMid: "#a8adb2",
-    statBarLow: "#888d92",
-    statBarMin: "#686d72",
-    badgeColor: "#b4b9be",
-    badgeBg: "rgba(180,185,190,0.08)",
-    badgeBorder: "rgba(180,185,190,0.2)",
-    badgeRadius: 2,
-    imageBorder: "rgba(160,165,170,0.25)",
-    cardBorder: "rgba(160,165,170,0.4)",
-    cardOutline: "rgba(160,165,170,0.08)",
-    cardShadow: "none",
+    bg: "linear-gradient(175deg, #2a2d30 0%, #1f2225 40%, #1a1c1e 100%)", bgHex: "#1a1c1e",
+    nameColor: "#e8ecef", nameFont: "system-ui, -apple-system, sans-serif", nameWeight: 300,
+    descColor: "#b0b8bc",
+    dividerColor: "rgba(184,191,196,0.12)", funColor: "#858d92",
+    statLabelColor: "#8b9297", statValueColor: "rgba(200,207,212,0.85)",
+    statBarTrack: "rgba(255,255,255,0.04)", statBarHigh: "#d8dde0", statBarMid: "#b8bfc4", statBarLow: "#989fa4", statBarMin: "#787f84",
+    badgeColor: "#b8bfc4", badgeBg: "rgba(255,255,255,0.03)", badgeBorder: "rgba(184,191,196,0.2)", badgeRadius: 2,
+    imageBorder: "rgba(184,191,196,0.35)", imageInset: "inset 0 0 0 1px rgba(255,255,255,0.04)",
+    cardBorder: "rgba(184,191,196,0.5)", cardOutline: "rgba(255,255,255,0.06)", cardOutlineOffset: 1, cardShadow: "none",
   },
   encyclopedia: {
-    bg: "linear-gradient(180deg, #f5f0e8 0%, #ede4d8 100%)",
-    bgHex: "#f5f0e8",
-    nameColor: "#5c3d2e",
-    nameFont: "var(--font-display), serif",
+    bg: "linear-gradient(180deg, #f5f0e8 0%, #ede4d8 100%)", bgHex: "#f5f0e8",
+    nameColor: "#5c3d2e", nameFont: "var(--font-display), serif", nameWeight: 700,
     descColor: "#4a3728",
-    dividerColor: "rgba(92,61,46,0.15)",
-    funColor: "#6b5544",
-    statLabelColor: "#7a6250",
-    statValueColor: "rgba(92,61,46,0.85)",
-    statBarTrack: "#ddd4c8",
-    statBarHigh: "#7a5038",
-    statBarMid: "#8c6045",
-    statBarLow: "#a07050",
-    statBarMin: "#6b4030",
-    badgeColor: "#5c3d2e",
-    badgeBg: "rgba(92,61,46,0.06)",
-    badgeBorder: "rgba(92,61,46,0.2)",
-    badgeRadius: 3,
-    imageBorder: "rgba(92,61,46,0.2)",
-    cardBorder: "rgba(92,61,46,0.35)",
-    cardOutline: "rgba(92,61,46,0.08)",
-    cardShadow: "0 1px 4px rgba(0,0,0,0.06)",
+    dividerColor: "rgba(92,61,46,0.15)", funColor: "#6b5544",
+    statLabelColor: "#7a6250", statValueColor: "rgba(92,61,46,0.85)",
+    statBarTrack: "#ddd4c8", statBarHigh: "#7a5038", statBarMid: "#8c6045", statBarLow: "#a07050", statBarMin: "#6b4030",
+    badgeColor: "#5c3d2e", badgeBg: "rgba(92,61,46,0.06)", badgeBorder: "rgba(92,61,46,0.2)", badgeRadius: 3,
+    imageBorder: "rgba(92,61,46,0.2)", imageInset: "none",
+    cardBorder: "rgba(92,61,46,0.35)", cardOutline: "rgba(92,61,46,0.08)", cardOutlineOffset: 2, cardShadow: "0 1px 4px rgba(0,0,0,0.06)",
   },
 };
 
@@ -136,10 +72,8 @@ const THEMES: Record<CardPreset, Theme> = {
 
 function NumericStatBar({ stat, t }: { stat: NumericStat; t: Theme }) {
   function barColor(score: number) {
-    if (score >= 80) return t.statBarHigh;
-    if (score >= 50) return t.statBarMid;
-    if (score >= 30) return t.statBarLow;
-    return t.statBarMin;
+    if (score >= 80) return t.statBarHigh; if (score >= 50) return t.statBarMid;
+    if (score >= 30) return t.statBarLow; return t.statBarMin;
   }
   return (
     <div className="flex items-center gap-3">
@@ -161,8 +95,6 @@ function TextStatBadge({ stat, t }: { stat: TextStat; t: Theme }) {
   );
 }
 
-/* ── Main component ──────────────────────────────────────── */
-
 export default function AtlasCardView({ card, onEdit, onClose }: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -172,6 +104,9 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
 
   const preset = card.cardPreset ?? "antique";
   const t = THEMES[preset];
+  const showGameIcons = preset === "game";
+  const showEncycIcons = preset === "encyclopedia";
+  const isLiquid = preset === "liquid-metal";
 
   const filename = `识物图鉴-${card.city}-${card.fantasyName}.png`.replace(/[\\/:*?"<>|]/g, "-").slice(0, 80);
   const imageSrc = card.croppedImageUrl || card.imageUrl;
@@ -203,37 +138,62 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
   return (
     <div className="flex justify-center">
       <div className="relative w-full max-w-[360px] mx-auto">
-        {/* Card body */}
-        <div
-          ref={cardRef}
-          style={{
-            background: t.bg, borderRadius: 4, padding: 16, width: "100%", maxWidth: 360, boxSizing: "border-box",
-            border: `1px solid ${t.cardBorder}`, outline: `1px solid ${t.cardOutline}`, outlineOffset: 2,
-            boxShadow: t.cardShadow, position: "relative",
-          }}
-        >
+        {/* ── Card body ──────────────────────────────── */}
+        <div ref={cardRef} style={{
+          background: t.bg, borderRadius: 4, padding: 16, width: "100%", maxWidth: 360, boxSizing: "border-box",
+          border: `1px solid ${t.cardBorder}`, outline: `1px solid ${t.cardOutline}`, outlineOffset: t.cardOutlineOffset,
+          boxShadow: t.cardShadow, position: "relative",
+        }}>
+          {/* liquid-metal: mirror sheen overlay */}
+          {isLiquid && (
+            <div style={{ position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 4, overflow: "hidden" }}>
+              <div style={{ position: "absolute", top: "-30%", left: "10%", width: "80%", height: "60%", background: "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 100%)", transform: "rotate(-3deg)" }} />
+              <div style={{ position: "absolute", top: 6, left: 6, width: 16, height: 1, background: "rgba(200,205,210,0.2)" }} />
+              <div style={{ position: "absolute", top: 6, left: 6, width: 1, height: 16, background: "rgba(200,205,210,0.2)" }} />
+              <div style={{ position: "absolute", bottom: 6, right: 6, width: 16, height: 1, background: "rgba(200,205,210,0.2)" }} />
+              <div style={{ position: "absolute", bottom: 6, right: 6, width: 1, height: 16, background: "rgba(200,205,210,0.2)" }} />
+            </div>
+          )}
+
           {/* 1. Image */}
           {imageSrc && (
-            <div className="mb-4 rounded-sm overflow-hidden" style={{ border: `1px solid ${t.imageBorder}` }}>
+            <div className="mb-4 rounded-sm overflow-hidden" style={{ border: `1px solid ${t.imageBorder}`, boxShadow: t.imageInset }}>
               <img src={imageSrc} alt="" className="w-full aspect-[1/1] object-cover" crossOrigin="anonymous" />
             </div>
           )}
 
-          {/* 2. Name + category same row */}
+          {/* 2. Name row */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%", marginBottom: 4 }}>
-            <h2 style={{ flex: 1, minWidth: 0, fontSize: 22, fontWeight: 700, letterSpacing: "0.08em", lineHeight: 1.3, color: t.nameColor, fontFamily: t.nameFont }}>
-              {card.fantasyName}
-            </h2>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+              {showGameIcons && <GameStar />}
+              {showEncycIcons && <EncycLeaf />}
+              <h2 style={{ minWidth: 0, fontSize: 22, fontWeight: t.nameWeight, letterSpacing: isLiquid ? "0.12em" : "0.08em", lineHeight: 1.3, color: t.nameColor, fontFamily: t.nameFont }}>
+                {card.fantasyName}
+              </h2>
+            </div>
             <span style={{
-              flexShrink: 0, minWidth: "max-content", width: "auto", padding: "6px 10px",
+              flexShrink: 0, minWidth: "max-content", width: "auto", padding: isLiquid ? "5px 10px" : "6px 10px",
+              display: "flex", alignItems: "center", gap: 4,
               lineHeight: 1, fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
               writingMode: "horizontal-tb", wordBreak: "keep-all", overflowWrap: "normal",
               color: t.badgeColor, background: t.badgeBg, border: `1px solid ${t.badgeBorder}`, borderRadius: t.badgeRadius,
-            }}>{card.category}</span>
+            }}>
+              {(showGameIcons || showEncycIcons) && (
+                <CategoryIcon category={card.category as import("@/lib/types").CategoryId} preset={preset} />
+              )}
+              {isLiquid && (
+                <span style={{ display: "inline-block", width: 4, height: 10, background: t.badgeColor, borderRadius: 1, marginRight: 4, opacity: 0.6 }} />
+              )}
+              {card.category}
+            </span>
           </div>
 
           {/* Divider */}
-          <div className="w-full h-px mb-3" style={{ background: t.dividerColor }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", marginBottom: 12 }}>
+            <div style={{ flex: 1, height: 1, background: t.dividerColor }} />
+            {showEncycIcons && <EncycFlower />}
+            <div style={{ flex: 1, height: 1, background: t.dividerColor }} />
+          </div>
 
           {/* 3. Description */}
           <p className="text-[14px] leading-relaxed mb-4" style={{ color: t.descColor }}>{card.description}</p>
@@ -246,7 +206,16 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
           </div>
 
           {/* 5. Fun fact */}
-          <div className="w-full h-px mb-2.5" style={{ background: t.dividerColor }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10 }}>
+            <div style={{ flex: 1, height: 1, background: t.dividerColor }} />
+            {showGameIcons && (
+              <svg width="14" height="4" viewBox="0 0 14 4" fill="none" style={{ flexShrink: 0, opacity: 0.3 }}>
+                <path d="M0 2 L4 0 L7 2 L10 0 L14 2" stroke="currentColor" strokeWidth="0.8" fill="none" style={{ color: t.nameColor }} />
+              </svg>
+            )}
+            {showEncycIcons && <EncycFlower />}
+            <div style={{ flex: 1, height: 1, background: t.dividerColor }} />
+          </div>
           <p className="text-[12px] leading-relaxed" style={{ color: t.funColor }}>{card.funFact}</p>
         </div>
 
