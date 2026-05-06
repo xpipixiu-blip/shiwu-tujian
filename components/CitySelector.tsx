@@ -4,113 +4,69 @@ import { useState, useRef } from "react";
 import { CITIES } from "@/lib/cities";
 import type { CityProfile } from "@/lib/cities";
 
-type Props = {
-  value: CityProfile | null;
-  onChange: (city: CityProfile) => void;
-  disabled?: boolean;
-};
+type Props = { value: CityProfile | null; onChange: (city: CityProfile) => void; disabled?: boolean };
 
 export default function CitySelector({ value, onChange, disabled }: Props) {
   const [customName, setCustomName] = useState("");
   const [showCustom, setShowCustom] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  return (
-    <div className="space-y-3">
-      <h2 className="text-sm font-medium text-stone-400 uppercase tracking-widest">
-        风格来源
-      </h2>
-      <p className="text-[10px] text-stone-600 -mt-2">
-        选择或输入城市 / 游戏 / 世界观 / 地区
-      </p>
+  const createProfile = (name: string): CityProfile => ({
+    id: name, name, vibe: "自定义", tone: "独特的",
+    prefixStyles: [name], suffixStyles: [`·${name}录`],
+    descriptionFlavor: `${name}风格`, statModifiers: [],
+  });
 
-      <div className="flex flex-wrap gap-2">
+  return (
+    <div className="space-y-2">
+      <h2 className="text-[10px] font-medium text-warm-200 uppercase tracking-[0.2em]">风格来源</h2>
+      <p className="text-[9px] text-warm-100 -mt-1">选择或输入城市 / 游戏 / 世界观 / 地区</p>
+
+      <div className="flex flex-wrap gap-1.5">
         {CITIES.map((city) => (
-          <button
-            key={city.id}
-            disabled={disabled}
+          <button key={city.id} disabled={disabled}
             onClick={() => onChange(city)}
-            className={`
-              px-3 py-2 rounded-lg text-sm font-medium border transition-all
-              disabled:opacity-50 disabled:cursor-not-allowed
-              ${
-                value?.id === city.id
-                  ? "bg-amber-800/80 text-amber-100 border-amber-600 shadow-lg shadow-amber-900/30"
-                  : "bg-stone-800/80 text-stone-300 border-stone-700 hover:border-amber-700/50 hover:text-amber-200"
-              }
-            `}
-          >
+            className={`px-3 py-1.5 rounded text-xs font-medium border transition-all disabled:opacity-50 ${
+              value?.id === city.id
+                ? "border-gold-500/40 text-gold-400"
+                : "bg-ink-800 border-ink-600 text-warm-200 hover:border-gold-500/30"
+            }`}
+            style={value?.id === city.id ? { background: "rgba(185,154,91,0.1)" } : {}}>
             {city.name}
-            <span className="block text-[10px] opacity-60">{city.vibe}</span>
+            <span className="block text-[9px] opacity-50">{city.vibe}</span>
           </button>
         ))}
-
-        <button
-          disabled={disabled}
-          onClick={() => {
-            setShowCustom(true);
-            setTimeout(() => inputRef.current?.focus(), 100);
-          }}
-          className={`
-            px-3 py-2 rounded-lg text-sm font-medium border transition-all
-            disabled:opacity-50 disabled:cursor-not-allowed
-            ${
-              showCustom
-                ? "bg-amber-800/80 text-amber-100 border-amber-600"
-                : "bg-stone-800/80 text-stone-400 border-stone-700 hover:border-amber-700/50 hover:text-amber-200"
-            }
-          `}
-        >
+        <button disabled={disabled}
+          onClick={() => { setShowCustom(true); setTimeout(() => inputRef.current?.focus(), 100); }}
+          className={`px-3 py-1.5 rounded text-xs font-medium border transition-all disabled:opacity-50 ${
+            showCustom ? "border-gold-500/40 text-gold-400" : "bg-ink-800 border-ink-600 text-warm-100 hover:border-gold-500/30"
+          }`}
+          style={showCustom ? { background: "rgba(185,154,91,0.1)" } : {}}>
           + 自定义
         </button>
       </div>
 
       {showCustom && (
         <div className="flex gap-2">
-          <input
-            ref={inputRef}
-            type="text"
-            value={customName}
+          <input ref={inputRef} type="text" value={customName}
             onChange={(e) => setCustomName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && customName.trim()) {
-                onChange({
-                  id: customName.trim(),
-                  name: customName.trim(),
-                  vibe: "自定义",
-                  tone: "独特的",
-                  prefixStyles: [customName.trim()],
-                  suffixStyles: [`·${customName.trim()}志`],
-                  descriptionFlavor: "独特气质",
-                  statModifiers: ["独特度"],
-                });
-                setShowCustom(false);
-                setCustomName("");
+                onChange(createProfile(customName.trim()));
+                setShowCustom(false); setCustomName("");
               }
             }}
             placeholder="输入城市 / 游戏 / 世界观 / 地区"
-            className="flex-1 px-3 py-2 bg-stone-800/80 border border-stone-700 rounded-lg text-sm text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-600"
-          />
-          <button
-            disabled={!customName.trim() || disabled}
+            className="flex-1 px-3 py-2 bg-ink-800 border border-ink-600 rounded text-sm text-warm-400 placeholder-warm-100 focus:outline-none focus:border-gold-500/30" />
+          <button disabled={!customName.trim() || disabled}
             onClick={() => {
               if (customName.trim()) {
-                onChange({
-                  id: customName.trim(),
-                  name: customName.trim(),
-                  vibe: "自定义",
-                  tone: "独特的",
-                  prefixStyles: [customName.trim()],
-                  suffixStyles: [`·${customName.trim()}志`],
-                  descriptionFlavor: "独特气质",
-                  statModifiers: ["独特度"],
-                });
-                setShowCustom(false);
-                setCustomName("");
+                onChange(createProfile(customName.trim()));
+                setShowCustom(false); setCustomName("");
               }
             }}
-            className="px-4 py-2 bg-amber-800/80 text-amber-100 rounded-lg text-sm font-medium border border-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+            className="px-4 py-2 rounded text-xs font-medium border border-gold-500/30 text-gold-400 disabled:opacity-50"
+            style={{ background: "rgba(185,154,91,0.1)" }}>
             确认
           </button>
         </div>
