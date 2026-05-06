@@ -91,7 +91,7 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
         <div
           ref={cardRef}
           className="relative card-stone card-gold-border"
-          style={{ borderRadius: 4, padding: 16 }}
+          style={{ borderRadius: 4, padding: 16, width: "100%", maxWidth: 360, boxSizing: "border-box" }}
         >
           {/* 1. Cropped image — ~45% of card */}
           {imageSrc && (
@@ -101,16 +101,30 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
           )}
 
           {/* 2. Name + category same row */}
-          <div className="flex items-baseline justify-between gap-2 mb-1">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%", marginBottom: 4 }}>
             <h2
-              className="text-[22px] sm:text-[24px] font-bold tracking-[0.08em] leading-tight"
-              style={{ color: "#c7aa67", fontFamily: "var(--font-display), serif" }}
+              style={{ flex: 1, minWidth: 0, fontSize: 22, fontWeight: 700, letterSpacing: "0.08em", lineHeight: 1.3, color: "#c7aa67", fontFamily: "var(--font-display), serif" }}
             >
               {card.fantasyName}
             </h2>
             <span
-              className="shrink-0 inline-block px-2 py-0.5 text-[11px] font-medium"
-              style={{ color: "#b99a5b", background: "rgba(185,154,91,0.08)", border: "1px solid rgba(185,154,91,0.2)", borderRadius: 3, marginTop: 2 }}
+              style={{
+                flexShrink: 0,
+                minWidth: "max-content",
+                width: "auto",
+                padding: "6px 10px",
+                lineHeight: 1,
+                fontSize: 11,
+                fontWeight: 500,
+                whiteSpace: "nowrap",
+                writingMode: "horizontal-tb",
+                wordBreak: "keep-all",
+                overflowWrap: "normal",
+                color: "#b99a5b",
+                background: "rgba(185,154,91,0.08)",
+                border: "1px solid rgba(185,154,91,0.2)",
+                borderRadius: 3,
+              }}
             >
               {card.category}
             </span>
