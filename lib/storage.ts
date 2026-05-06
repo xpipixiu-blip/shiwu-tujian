@@ -1,6 +1,7 @@
 import type { AtlasCard } from "./types";
 
 const STORAGE_KEY = "chuunibyou-atlas-cards";
+const MAX_CARDS = 30;
 
 export function loadCards(): AtlasCard[] {
   if (typeof window === "undefined") return [];
@@ -22,14 +23,26 @@ export function saveCard(card: AtlasCard): void {
   } else {
     cards.unshift(card);
   }
-  // Keep max 50 cards to avoid localStorage bloat
-  const trimmed = cards.slice(0, 50);
-  // Only store essential fields, strip imageUrl if it's too large
+  const trimmed = cards.slice(0, MAX_CARDS);
+  // Strip large base64 fields — only save structured data, not images
   const toSave = trimmed.map((c) => ({
     ...c,
-    imageUrl: c.imageUrl.length > 200_000 ? "" : c.imageUrl,
+    imageUrl: "",
+    croppedImageUrl: "",
   }));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+  } catch {
+    // If still too large, trim more aggressively
+    const minimal = trimmed.slice(0, 10).map((c) => ({
+      ...c,
+      imageUrl: "",
+      croppedImageUrl: "",
+    }));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
+    } catch { /* storage full — silently ignore */ }
+  }
 }
 
 export function deleteCard(id: string): void {

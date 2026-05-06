@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import CitySelector from "@/components/CitySelector";
 import PhotoUploader from "@/components/PhotoUploader";
 import ImagePreview from "@/components/ImagePreview";
@@ -19,6 +19,12 @@ import type { SubjectBox, CropBox } from "@/lib/crop-utils";
 import { loadByokConfig, saveByokConfig, clearByokConfig } from "@/lib/byok-storage";
 import type { ByokConfig } from "@/lib/byok-storage";
 
+type Detection = {
+  subjectBox: SubjectBox;
+  cropBox: CropBox;
+  croppedImageUrl: string;
+};
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -29,7 +35,6 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 export default function HomePage() {
-  // --- Core state ---
   const [city, setCity] = useState<CityProfile | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [currentCard, setCurrentCard] = useState<AtlasCard | null>(null);
@@ -40,17 +45,18 @@ export default function HomePage() {
   const [modelId, setModelId] = useState("");
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
-  const [subjectBox, setSubjectBox] = useState<SubjectBox | null>(null);
-  const [cropBox, setCropBox] = useState<CropBox | null>(null);
-  const [croppedImageUrl, setCroppedImageUrl] = useState<string | null>(null);
+  const [detection, setDetection] = useState<Detection | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
-  const [resizedBase64, setResizedBase64] = useState<string | null>(null);
 
-  // --- BYOK state ---
+  // BYOK state
   const [byokConfig, setByokConfig] = useState<ByokConfig | null>(null);
   const [showApiSettings, setShowApiSettings] = useState(false);
 
-  // Build BYOK params for API calls
+  // Refs — not rendered, avoid React state overhead
+  const resizedBase64Ref = useRef<string | null>(null);
+  const detectingRef = useRef(false);
+  const generatingRef = useRef(false);
+
   const byokParams = useMemo(() => {
     if (!byokConfig?.enabled) return {};
     return {
@@ -60,12 +66,10 @@ export default function HomePage() {
     };
   }, [byokConfig]);
 
-  // Effective model ID: BYOK's modelId takes priority over site model
   const effectiveModelId = byokConfig?.enabled && byokConfig.modelId
     ? byokConfig.modelId
     : modelId;
 
-  // Load history, saved modelId, and BYOK config on mount
   useEffect(() => {
     setHistory(loadCards());
     const saved = loadModelId();
@@ -80,24 +84,36 @@ export default function HomePage() {
   }, []);
 
   const resetDetection = useCallback(() => {
-    setSubjectBox(null);
-    setCropBox(null);
-    setCroppedImageUrl(null);
-    setResizedBase64(null);
+    setDetection(null);
+    resizedBase64Ref.current = null;
     setGenerateError(null);
   }, []);
 
-  // ── Detect subject ────────────────────────────────────────
+  // ── Memoized callbacks for child components ──────────────
+
+  const handleCityChange = useCallback((c: CityProfile) => {
+    setCity(c);
+    resetCard();
+  }, [resetCard]);
+
+  const handleImageSelect = useCallback((f: File) => {
+    setImageFile(f);
+    resetCard();
+    resetDetection();
+  }, [resetCard, resetDetection]);
+
+  // ── Detect subject ──────────────────────────────────────
 
   const handleDetect = useCallback(async () => {
     if (!imageFile || !effectiveModelId) return;
-
+    if (detectingRef.current) return; // double-click guard
+    detectingRef.current = true;
     setIsDetecting(true);
     setGenerateError(null);
 
     try {
       const base64 = await resizeImageForUpload(imageFile);
-      setResizedBase64(base64);
+      resizedBase64Ref.current = base64;
 
       const res = await fetch("/api/detect-subject", {
         method: "POST",
@@ -112,33 +128,38 @@ export default function HomePage() {
       if (!res.ok) throw new Error(data.error ?? "检测失败");
 
       const box = data.subjectBox as SubjectBox;
-      setSubjectBox(box);
 
       const img = await loadImage(base64);
       const crop = calculateCrop(img.width, img.height, box);
-      setCropBox(crop);
 
       const cropped = await cropImage(base64, crop);
-      setCroppedImageUrl(cropped);
+
+      // Batch all detection results into ONE state update
+      setDetection({
+        subjectBox: box,
+        cropBox: crop,
+        croppedImageUrl: cropped,
+      });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "检测失败";
-      setGenerateError(msg);
+      setGenerateError((e as Error).message);
       resetDetection();
     } finally {
       setIsDetecting(false);
+      detectingRef.current = false;
     }
   }, [imageFile, effectiveModelId, resetDetection, byokParams]);
 
-  // ── Generate card ─────────────────────────────────────────
+  // ── Generate card ───────────────────────────────────────
 
   const handleGenerate = useCallback(async () => {
     if (!city || !imageFile || !effectiveModelId) return;
-
+    if (generatingRef.current) return; // double-click guard
+    generatingRef.current = true;
     setIsGenerating(true);
     setGenerateError(null);
 
     try {
-      const imageBase64 = croppedImageUrl ?? await resizeImageForUpload(imageFile);
+      const imageBase64 = detection?.croppedImageUrl ?? await resizeImageForUpload(imageFile);
 
       const res = await fetch("/api/generate-atlas-card", {
         method: "POST",
@@ -155,17 +176,19 @@ export default function HomePage() {
       if (!res.ok) throw new Error(data.error ?? "生成失败");
 
       const card = data.card as AtlasCard;
-      if (croppedImageUrl) card.croppedImageUrl = croppedImageUrl;
+      if (detection?.croppedImageUrl) {
+        card.croppedImageUrl = detection.croppedImageUrl;
+      }
       setCurrentCard(card);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "未知错误";
-      setGenerateError(msg);
+      setGenerateError((e as Error).message);
     } finally {
       setIsGenerating(false);
+      generatingRef.current = false;
     }
-  }, [city, imageFile, effectiveModelId, croppedImageUrl, byokParams]);
+  }, [city, imageFile, effectiveModelId, detection, byokParams]);
 
-  // ── Save to history ──────────────────────────────────────
+  // ── Save to history ────────────────────────────────────
 
   const handleSaveToHistory = useCallback(() => {
     if (!currentCard) return;
@@ -173,60 +196,53 @@ export default function HomePage() {
     setHistory(loadCards());
   }, [currentCard]);
 
-  // ── Edit and regenerate ──────────────────────────────────
+  // ── Edit and regenerate ─────────────────────────────────
 
   const handleOpenEdit = useCallback(() => {
     setEditError(null);
     setShowEditModal(true);
   }, []);
 
-  const handleEditSubmit = useCallback(
-    async (newName: string) => {
-      if (!currentCard || !effectiveModelId) return;
+  const handleEditSubmit = useCallback(async (newName: string) => {
+    if (!currentCard || !effectiveModelId) return;
+    setShowEditModal(false);
+    setIsEditing(true);
+    setEditError(null);
 
-      setShowEditModal(false);
-      setIsEditing(true);
-      setEditError(null);
+    try {
+      const res = await fetch("/api/regenerate-atlas-card", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          city: currentCard.city,
+          modelId: effectiveModelId,
+          originalObjectName: currentCard.originalObjectName,
+          category: currentCard.category,
+          userEditedFantasyName: newName,
+          ...byokParams,
+        }),
+      });
 
-      try {
-        const res = await fetch("/api/regenerate-atlas-card", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            city: currentCard.city,
-            modelId: effectiveModelId,
-            originalObjectName: currentCard.originalObjectName,
-            category: currentCard.category,
-            userEditedFantasyName: newName,
-            ...byokParams,
-          }),
-        });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "重新生成失败");
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "重新生成失败");
+      setCurrentCard({
+        ...currentCard,
+        id: `card-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        fantasyName: data.fantasyName ?? newName,
+        description: data.description ?? currentCard.description,
+        stats: data.stats ?? currentCard.stats,
+        funFact: data.funFact ?? currentCard.funFact,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (e) {
+      setEditError((e as Error).message);
+    } finally {
+      setIsEditing(false);
+    }
+  }, [currentCard, effectiveModelId, byokParams]);
 
-        const newCard: AtlasCard = {
-          ...currentCard,
-          id: `card-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          fantasyName: data.fantasyName ?? newName,
-          description: data.description ?? currentCard.description,
-          stats: data.stats ?? currentCard.stats,
-          funFact: data.funFact ?? currentCard.funFact,
-          createdAt: new Date().toISOString(),
-        };
-
-        setCurrentCard(newCard);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "未知错误";
-        setEditError(msg);
-      } finally {
-        setIsEditing(false);
-      }
-    },
-    [currentCard, effectiveModelId, byokParams]
-  );
-
-  // ── BYOK handlers ────────────────────────────────────────
+  // ── BYOK handlers ──────────────────────────────────────
 
   const handleSaveByok = useCallback((config: ByokConfig, remember: boolean) => {
     setByokConfig(config);
@@ -238,7 +254,7 @@ export default function HomePage() {
     clearByokConfig();
   }, []);
 
-  // ── History handlers ──────────────────────────────────────
+  // ── History handlers ────────────────────────────────────
 
   const handleHistorySelect = useCallback((card: AtlasCard) => {
     setCurrentCard(card);
@@ -249,20 +265,17 @@ export default function HomePage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  const handleHistoryDelete = useCallback(
-    (id: string) => {
-      deleteCard(id);
-      setHistory(loadCards());
-      if (currentCard?.id === id) setCurrentCard(null);
-    },
-    [currentCard]
-  );
+  const handleHistoryDelete = useCallback((id: string) => {
+    deleteCard(id);
+    setHistory(loadCards());
+    if (currentCard?.id === id) setCurrentCard(null);
+  }, [currentCard]);
 
-  // ── Derived ───────────────────────────────────────────────
+  // ── Derived ─────────────────────────────────────────────
 
   const canGenerate = city !== null && imageFile !== null && effectiveModelId !== "" && !isGenerating;
 
-  // ── Render ────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────
 
   return (
     <div className="min-h-[100dvh] flex flex-col">
@@ -280,7 +293,6 @@ export default function HomePage() {
         <p className="text-xs text-stone-500 mt-1 tracking-wider">
           拍照识物 · 风格生成 · 图鉴收藏
         </p>
-        {/* API Settings button */}
         <button
           onClick={() => setShowApiSettings(true)}
           className="absolute top-6 right-4 px-3 py-1.5 rounded-lg text-xs border border-stone-700 text-stone-400 hover:border-amber-700/50 hover:text-amber-300 transition-colors"
@@ -325,18 +337,18 @@ export default function HomePage() {
 
             <CitySelector
               value={city}
-              onChange={(c) => { setCity(c); resetCard(); }}
+              onChange={handleCityChange}
               disabled={isGenerating}
             />
 
             <PhotoUploader
-              onImageSelect={(f) => { setImageFile(f); resetCard(); resetDetection(); }}
+              onImageSelect={handleImageSelect}
               disabled={isGenerating}
             />
 
             <ImagePreview file={imageFile} />
 
-            {imageFile && !croppedImageUrl && (
+            {imageFile && !detection?.croppedImageUrl && (
               <button
                 onClick={handleDetect}
                 disabled={!effectiveModelId || isDetecting}
@@ -357,11 +369,11 @@ export default function HomePage() {
               </button>
             )}
 
-            {croppedImageUrl && (
+            {detection?.croppedImageUrl && (
               <div className="space-y-3">
                 <h2 className="text-sm font-medium text-stone-400 uppercase tracking-widest">裁切预览</h2>
                 <div className="relative rounded-xl overflow-hidden border border-amber-800/40 bg-stone-900">
-                  <img src={croppedImageUrl} alt="裁切结果" className="w-full aspect-square object-cover" />
+                  <img src={detection.croppedImageUrl} alt="裁切结果" className="w-full aspect-square object-cover" />
                 </div>
                 <div className="flex gap-2">
                   <button
