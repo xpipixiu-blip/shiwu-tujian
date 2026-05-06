@@ -34,15 +34,16 @@ const THEMES: Record<CardPreset, Theme> = {
     cardBorder: "rgba(185,154,91,0.5)", cardOutline: "rgba(185,154,91,0.12)", cardOutlineOffset: 2, cardShadow: "none",
   },
   game: {
-    bg: "linear-gradient(180deg, #0d1117 0%, #111820 100%)", bgHex: "#0d1117",
-    nameColor: "#8bc29a", nameFont: "system-ui, -apple-system, sans-serif", nameWeight: 700,
-    descColor: "#b8c5c8",
-    dividerColor: "rgba(139,194,154,0.2)", funColor: "#6b7c80",
-    statLabelColor: "#7a8c90", statValueColor: "rgba(139,194,154,0.9)",
-    statBarTrack: "#1a2428", statBarHigh: "#8bc29a", statBarMid: "#6ba87a", statBarLow: "#4a8a5a", statBarMin: "#3a6a4a",
-    badgeColor: "#8bc29a", badgeBg: "rgba(139,194,154,0.1)", badgeBorder: "rgba(139,194,154,0.25)", badgeRadius: 8,
-    imageBorder: "rgba(139,194,154,0.25)", imageInset: "none",
-    cardBorder: "rgba(139,194,154,0.4)", cardOutline: "rgba(139,194,154,0.08)", cardOutlineOffset: 2, cardShadow: "0 0 12px rgba(139,194,154,0.06)",
+    bg: "#101418", bgHex: "#101418",
+    nameColor: "#a0d6a8", nameFont: '"Courier New", "SF Mono", monospace', nameWeight: 700,
+    descColor: "#c0c8b8",
+    dividerColor: "rgba(139,194,154,0.25)", funColor: "#889080",
+    statLabelColor: "#889480", statValueColor: "rgba(160,214,168,0.9)",
+    statBarTrack: "#1a241c", statBarHigh: "#a0d6a8", statBarMid: "#78b880", statBarLow: "#509860", statBarMin: "#387840",
+    badgeColor: "#a0d6a8", badgeBg: "rgba(139,194,154,0.08)", badgeBorder: "rgba(139,194,154,0.3)", badgeRadius: 0,
+    imageBorder: "rgba(139,194,154,0.3)", imageInset: "none",
+    cardBorder: "rgba(139,194,154,0.5)", cardOutline: "rgba(139,194,154,0.1)", cardOutlineOffset: 2,
+    cardShadow: "2px 0 0 rgba(139,194,154,0.12), 0 2px 0 rgba(139,194,154,0.12), 4px 0 0 rgba(139,194,154,0.06), 0 4px 0 rgba(139,194,154,0.06)",
   },
   "liquid-metal": {
     bg: "linear-gradient(175deg, #2a2d30 0%, #1f2225 40%, #1a1c1e 100%)", bgHex: "#1a1c1e",
@@ -70,16 +71,22 @@ const THEMES: Record<CardPreset, Theme> = {
 
 /* ── Sub-components ─────────────────────────────────────── */
 
-function NumericStatBar({ stat, t }: { stat: NumericStat; t: Theme }) {
+function NumericStatBar({ stat, t, isGame }: { stat: NumericStat; t: Theme; isGame?: boolean }) {
   function barColor(score: number) {
     if (score >= 80) return t.statBarHigh; if (score >= 50) return t.statBarMid;
     if (score >= 30) return t.statBarLow; return t.statBarMin;
   }
+  const pct = stat.score;
+  const color = barColor(pct);
+  // Pixel stepped bar for game, smooth gradient otherwise
+  const fillStyle = isGame
+    ? { width: `${pct}%`, background: `repeating-linear-gradient(90deg, ${color} 0px, ${color} 3px, transparent 3px, transparent 5px)` }
+    : { width: `${pct}%`, background: `linear-gradient(90deg, transparent, ${color})` };
   return (
     <div className="flex items-center gap-3">
       <span className="text-[12px] w-14 shrink-0" style={{ color: t.statLabelColor }}>{stat.label}</span>
-      <div className="flex-1 h-[3px] rounded-full overflow-hidden" style={{ background: t.statBarTrack }}>
-        <div className="h-full rounded-full" style={{ width: `${stat.score}%`, background: `linear-gradient(90deg, transparent, ${barColor(stat.score)})` }} />
+      <div className="flex-1 h-[4px] overflow-hidden" style={{ background: t.statBarTrack, borderRadius: isGame ? 0 : 2 }}>
+        <div className="h-full" style={fillStyle} />
       </div>
       <span className="text-[12px] tabular-nums w-8 text-right" style={{ color: t.statValueColor }}>{stat.score}</span>
     </div>
@@ -106,6 +113,7 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
   const t = THEMES[preset];
   const showEmoji = preset === "game" || preset === "encyclopedia";
   const isLiquid = preset === "liquid-metal";
+  const isGame = preset === "game";
   const catEmoji = showEmoji ? getCategoryEmoji(card.category as import("@/lib/types").CategoryId, preset) : "";
 
   const filename = `识物图鉴-${card.city}-${card.fantasyName}.png`.replace(/[\\/:*?"<>|]/g, "-").slice(0, 80);
@@ -144,6 +152,12 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
           border: `1px solid ${t.cardBorder}`, outline: `1px solid ${t.cardOutline}`, outlineOffset: t.cardOutlineOffset,
           boxShadow: t.cardShadow, position: "relative",
         }}>
+          {/* game: pixel grid overlay */}
+          {isGame && (
+            <div style={{ position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 4, overflow: "hidden", opacity: 0.04,
+              backgroundImage: "repeating-linear-gradient(0deg, #8bc29a, #8bc29a 1px, transparent 1px, transparent 4px), repeating-linear-gradient(90deg, #8bc29a, #8bc29a 1px, transparent 1px, transparent 4px)" }} />
+          )}
+
           {/* liquid-metal: mirror sheen overlay */}
           {isLiquid && (
             <div style={{ position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 4, overflow: "hidden" }}>
@@ -196,7 +210,7 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
           {/* 4. Stats */}
           <div className="space-y-2.5 mb-4">
             {card.stats.slice(0, 3).map((stat, i) =>
-              stat.type === "numeric" ? <NumericStatBar key={i} stat={stat} t={t} /> : <TextStatBadge key={i} stat={stat} t={t} />
+              stat.type === "numeric" ? <NumericStatBar key={i} stat={stat} t={t} isGame={isGame} /> : <TextStatBadge key={i} stat={stat} t={t} />
             )}
           </div>
 
