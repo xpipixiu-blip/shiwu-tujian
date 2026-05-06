@@ -132,6 +132,36 @@ const PRESETS: StyleProfile[] = [
     styleDirection: "像南法小镇面包店门口的手写小黑板，慵懒明媚、充满生活感",
     avoidNames: ["南法", "普罗旺斯", "法国"],
   },
+  {
+    source: "东方志怪",
+    moodKeywords: ["妖异", "草木成精", "山海", "古卷", "水墨", "幽玄"],
+    styleDirection: "像一本泛黄的古卷里夹着的便条，字迹清瘦，提到的东西介于真实和传说之间",
+    avoidNames: ["东方志怪", "山海经", "聊斋"],
+  },
+  {
+    source: "废土荒原",
+    moodKeywords: ["荒芜", "生存", "锈蚀", "风沙", "遗物", "粗粝"],
+    styleDirection: "像一张被风沙磨得边缘发毛的废纸片，每个字都带着干燥和节约",
+    avoidNames: ["废土", "废土荒原", "末日"],
+  },
+  {
+    source: "深海遗迹",
+    moodKeywords: ["幽深", "寂静", "水压", "古老", "贝壳", "暗流"],
+    styleDirection: "像一块被海水浸透的羊皮纸，字迹模糊但沉静，带着深海特有的冷感和缓慢",
+    avoidNames: ["深海遗迹", "亚特兰蒂斯", "海底"],
+  },
+  {
+    source: "太空殖民地",
+    moodKeywords: ["失重", "人造", "冰冷", "资源稀缺", "轨道", "舱室"],
+    styleDirection: "像一个太空站里贴在物资箱上的电子标签，冷感、精确、不带多余情感",
+    avoidNames: ["太空殖民地", "殖民地", "太空"],
+  },
+  {
+    source: "魔法学院",
+    moodKeywords: ["古老", "书卷", "秘法", "学徒", "塔楼", "羊皮纸"],
+    styleDirection: "像魔法学院图书馆里夹在旧书中的手写便签，学究气、略带一丝新手的谨慎",
+    avoidNames: ["魔法学院", "霍格沃茨", "学院"],
+  },
 ];
 
 const cache = new Map<string, StyleProfile>();

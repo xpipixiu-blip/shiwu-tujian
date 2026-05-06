@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { chatCompletion, extractJSON, ApiError } from "@/lib/api-helpers";
 import { atlasCardContentSchema } from "@/lib/schemas";
-import { resolveStyleProfile as resolveCityProfile, isPlainIntroMode } from "@/lib/cities";
+import { isPlainIntroMode } from "@/lib/cities";
 import { resolveStyleProfile } from "@/lib/style-profiles";
 import type { StyleProfile } from "@/lib/style-profiles";
 
@@ -14,45 +14,42 @@ async function regenerateContent(
 ) {
   const systemPrompt = plain
     ? "你是「识物图鉴」的普通介绍执笔人。用户修改了物品名称，你根据新名称重新生成其余内容。"
-    : "你是「识物图鉴」的执笔人。用户修改了图鉴卡片的名称，根据新名称重新生成其余内容。";
+    : "你是「识物图鉴」的执笔人。用户修改了卡片名称，你根据新名称重新生成其余内容。吸收设定气质，不是复读名词。";
 
   const userPrompt = plain ? `请为以下物体重新生成普通介绍。
-物体：${objectName}
-分类：${category}
-用户新名称：${newFantasyName}
+物体：${objectName} / 分类：${category} / 新名称：${newFantasyName}
 返回 JSON：{ "fantasyName": "${newFantasyName}", "description": "1-2句普通介绍（≤60字）", "stats": [ { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 50 }, { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 70 }, { "type": "text", "label": "属性（≤4字）", "value": "值（≤6字）" } ], "funFact": "1句真实小知识（≤40字）" }
 规则 - fantasyName 不修改 - description：客观自然 - stats：恰好3条 - funFact：真实冷知识 - 只输出 JSON`
     : `请为以下物体重新生成图鉴卡片内容。
-背景
+
+设定氛围
 - 风格方向：${sp.styleDirection}
-- ${sp.moodKeywords.length ? `氛围关键词：${sp.moodKeywords.join("、")}` : ""}
-- 物体：${objectName}
-- 分类：${category}
+${sp.moodKeywords.length ? `- 吸收这些气质：${sp.moodKeywords.join("、")}` : ""}
+- 物体：${objectName} / 分类：${category}
 - 用户新名称：${newFantasyName}
+
 返回 JSON：{ "fantasyName": "${newFantasyName}", "description": "1-2句（≤60字）", "stats": [ { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 50 }, { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 70 }, { "type": "text", "label": "属性（≤4字）", "value": "值（≤6字）" } ], "funFact": "1句（≤40字）" }
-规则
+
+要求
 - fantasyName 不修改
-- description：围绕物体幻想设定，${sp.avoidNames.length ? `禁止包含：${sp.avoidNames.join("、")}` : "禁止出现地名或专有名词"}，≤60字
-- stats：恰好3条，2条numeric + 1条text
-- funFact：≤40字，可以轻轻体现氛围，但克制自然
+- description：围绕物体幻想特质，${sp.avoidNames.length ? `严禁包含：${sp.avoidNames.join("、")}` : "严禁出现地名或专有名词"}，≤60字
+- stats：恰好3条，2+1，label ≤4字，贴合设定氛围和物体类别
+- funFact：≤40字，轻轻融入设定气质，克制自然
+- 吸收气质，不堆名词
 - 只输出 JSON`;
 
   const content = await chatCompletion(modelId, [
     { role: "system", content: systemPrompt }, { role: "user", content: userPrompt },
   ], { temperature: plain ? 0.4 : 0.8, maxTokens: 1024, jsonMode: true, userApiKey: byok?.userApiKey, userBaseUrl: byok?.userBaseUrl });
-
   return atlasCardContentSchema.parse(JSON.parse(extractJSON(content)));
 }
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-
   const { city, modelId, originalObjectName, category, userEditedFantasyName, userApiKey, userBaseUrl, userModelId } = body as Record<string, string | undefined>;
   const effectiveModelId = (userModelId || modelId) as string | undefined;
-  if (!city || !effectiveModelId || !originalObjectName || !category || !userEditedFantasyName) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-  }
+  if (!city || !effectiveModelId || !originalObjectName || !category || !userEditedFantasyName) return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
 
   const plain = isPlainIntroMode(city);
   const sp = resolveStyleProfile(city);

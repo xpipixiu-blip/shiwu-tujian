@@ -32,26 +32,41 @@ async function generateCardContent(
 ) {
   const systemPrompt = plain
     ? "你是「识物图鉴」的普通介绍执笔人。你为现实物体撰写客观、准确的介绍。"
-    : "你是「识物图鉴」的执笔人。你为现实物体撰写幻想风格的图鉴卡片。";
+    : `你是「识物图鉴」的执笔人。你要做的是：吸收一个设定世界的气质，然后用这种气质去描述一个现实物体。不是把设定名词贴在物品上，而是让物品像从那个世界里自然生长出来的。
+
+核心原则：
+1. 先理解设定氛围，再结合物体本身
+2. 不要直接把设定来源名粘到物品名前面
+3. 如果去掉设定名词后描述仍然成立→氛围融合太弱，要改写
+4. 如果全靠地名/专有名词撑起描述→融合太硬，要改写
+5. 最终的卡片应该像"这个设定世界里自然存在的物品说明"，不是"普通物品+设定标签"`;
 
   const userPrompt = plain ? `请为以下物体撰写普通介绍。
 物体：${objectName}
 分类：${category}
 返回 JSON：{ "fantasyName": "${objectName}", "description": "1-2句普通介绍（≤60字）", "stats": [ { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 50 }, { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 70 }, { "type": "text", "label": "属性（≤4字）", "value": "值（≤6字）" } ], "funFact": "1句真实小知识（≤40字）" }
-规则 - fantasyName：使用真实物品名称 - description：客观自然清楚 - stats：恰好3条，2+1 - funFact：真实冷知识 - 只输出 JSON`
-    : `请为以下物体撰写一张图鉴卡片。
-背景
+规则 - fantasyName：使用真实物品名称 - description：客观自然清楚 - stats：恰好3条 - funFact：真实冷知识 - 只输出 JSON`
+    : `请为以下物体撰写图鉴卡片。
+
+设定氛围
 - 风格方向：${sp.styleDirection}
-${sp.moodKeywords.length ? `- 氛围关键词：${sp.moodKeywords.join("、")}` : ""}
-- 物体：${objectName}
-- 分类：${category}
+${sp.moodKeywords.length ? `- 吸收这些气质：${sp.moodKeywords.join("、")}` : ""}
+- 物体：${objectName} / 分类：${category}
+
 返回 JSON：{ "fantasyName": "幻想名（4-8字优先，最多12字）", "description": "1-2句（≤60字）", "stats": [ { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 50 }, { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 70 }, { "type": "text", "label": "属性（≤4字）", "value": "值（≤6字）" } ], "funFact": "1句（≤40字）" }
-规则
-- fantasyName：有创意，4-8字优先。${sp.avoidNames.length ? `禁止包含：${sp.avoidNames.join("、")}` : "禁止包含风格来源名或地标名"}
-- description：围绕物体本身的幻想设定，禁止出现地名或专有名词，≤60字
-- stats：恰好3条，2条numeric + 1条text，label ≤4字
-- funFact：≤40字，可以轻轻体现风格方向的氛围，克制自然，不堆专有名词
-- 只输出 JSON`;
+
+写作要求
+- fantasyName：有创意，4-8字优先。${sp.avoidNames.length ? `严禁包含：${sp.avoidNames.join("、")}` : "严禁包含风格来源名或地标名"}
+- description：围绕物体本身的幻想特质，禁止出现任何地名或专有名词，≤60字
+- stats：恰好3条，2条numeric + 1条text。label ≤4字，要贴合设定氛围和物体类别
+- funFact：≤40字，是唯一可以融入设定氛围的地方，但不要堆专有名词。写成轻松有趣的一句
+
+自检（不要输出自检过程，只在心里做）：
+1. 把设定名词从结果中全部去掉，文案是否还成立？成立→氛围太弱
+2. 文案是否全靠地名/专有名词成立？是→太硬，改写
+3. 最终输出是否像"这个设定世界里自然存在的物品说明"？
+
+只输出 JSON`;
 
   const content = await chatCompletion(modelId, [
     { role: "system", content: systemPrompt }, { role: "user", content: userPrompt },
