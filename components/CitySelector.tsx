@@ -20,7 +20,7 @@ export default function CitySelector({ value, onChange, disabled }: Props) {
   return (
     <div className="space-y-2">
       <h2 className="text-[10px] font-medium text-warm-200 uppercase tracking-[0.2em]">风格来源</h2>
-      <p className="text-[9px] text-warm-100 -mt-1">选择或输入城市 / 游戏 / 世界观 / 地区</p>
+      <p className="text-[9px] text-warm-100 -mt-1">输入城市 / 游戏 / 世界观可生成风格化图鉴；输入「普通介绍」则生成普通物品介绍</p>
 
       <div className="flex flex-wrap gap-1.5">
         {CITIES.map((city) => (
@@ -56,7 +56,7 @@ export default function CitySelector({ value, onChange, disabled }: Props) {
                 setShowCustom(false); setCustomName("");
               }
             }}
-            placeholder="输入城市 / 游戏 / 世界观 / 地区"
+            placeholder="例如：上海、艾尔登法环、马德里、普通介绍"
             className="flex-1 px-3 py-2 bg-ink-800 border border-ink-600 rounded text-sm text-warm-400 placeholder-warm-100 focus:outline-none focus:border-gold-500/30" />
           <button disabled={!customName.trim() || disabled}
             onClick={() => {

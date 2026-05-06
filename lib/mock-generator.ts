@@ -1,6 +1,6 @@
 import type { AtlasCard, NumericStat, TextStat, CategoryId } from "./types";
 import type { CityProfile } from "./cities";
-import { CITIES } from "./cities";
+import { CITIES, isPlainIntroMode } from "./cities";
 
 let idCounter = 0;
 
@@ -406,6 +406,58 @@ function generateFunFact(
   return pick(GENERIC_FUN_FACTS);
 }
 
+// ─── Plain mode helpers ────────────────────────────────────────
+
+const PLAIN_DESCRIPTIONS: Record<string, string[]> = {
+  food: ["常见的{type}类食材，口感{p1}，适合日常食用。", "一种{p1}的{type}，富含营养，广泛栽培。", "日常饮食中常见的{type}，{p1}是其最大特点。"],
+  mineral: ["一种{p1}的{type}，硬度约为{p2}级，广泛分布于自然界。", "自然界中常见的{type}，具有{p1}光泽。", "以{p1}闻名的{type}，常被用于工业和装饰。"],
+  animal: ["一种{p1}的{type}，主要栖息于{habitat}。", "常见的{size}型{type}，以{p1}著称。", "分布广泛的{type}，{p1}是其主要特征。"],
+  plant: ["一种{season}生长的{type}，{part}具有{p1}的特点。", "常见的{type}科植物，{p1}，适应性{p2}。", "{habitat}常见的{type}，{season}是其主要生长季。"],
+  building: ["一座{p1}的{type}，建于{p2}年前，保存完好。", "具有{p1}风格的{type}，主要材质为{p2}。", "当地地标性的{type}，以{p1}闻名。"],
+  object: ["一种{p1}的{type}，常用于日常生活。", "常见的{type}，材质为{p2}，{p1}。", "以{p1}为特点的{type}，{p2}是其常见用途。"],
+  water: ["一处{p1}的{type}，水质{p2}，生态环境良好。", "自然形成的{type}，以{p1}闻名。", "当地重要的{type}资源，{p1}是其最大特征。"],
+  sky: ["一种{p1}的{type}现象，通常在{p2}可见。", "常见的{type}现象，{p1}时最为壮观。", "{type}是一种{p1}的自然现象。"],
+};
+
+const PLAIN_FACTS: Record<string, string[]> = {
+  food: ["每100克约含{val1}千卡热量。", "原产于{habitat}，已有{p2}年栽培历史。", "富含维生素和矿物质，营养价值高。", "世界上有超过{p2}个品种。"],
+  mineral: ["硬度为{p2}，在莫氏硬度表中属于中等。", "形成于约{p2}万年前的地质活动。", "主要成分为{p1}，密度约为{p2}g/cm³。", "在地壳中含量约为{p2}%。"],
+  animal: ["寿命约{p2}年，野外可活更久。", "主要天敌包括{p1}等。", "繁殖季节在{season}，每次产{p2}只后代。", "全球种群数量估计约{p2}万。"],
+  plant: ["原产于{habitat}，现已广泛引种。", "生长周期约{p2}天，{season}为最佳观赏期。", "具有{p1}的药用价值。", "全球已知{p2}多个品种。"],
+  building: ["建于{p2}年，已有{p2}年历史。", "由{p1}设计，属于{p2}风格。", "占地面积约{p2}平方米。", "被列为{p1}保护单位。"],
+  object: ["发明于{p2}年前，由{p1}首创。", "全球年产量超过{p2}万件。", "主要材质为{p2}，{p1}是其主要特点。", "标准尺寸约{p2}厘米。"],
+  water: ["平均深度{p2}米，最深处达{p2}米。", "流域面积约{p2}平方公里。", "水质达到{p1}标准。", "年径流量约{p2}亿立方米。"],
+  sky: ["出现频率约为每年{p2}次。", "最佳观测时间在{season}。", "形成需要{p1}的气象条件。", "持续时间通常为{p2}分钟。"],
+};
+
+function generatePlainName(_city: CityProfile, objectName: string, _category: CategoryId): string {
+  return objectName;
+}
+
+function generatePlainDescription(
+  _city: CityProfile, _objectName: string, category: CategoryId, _fantasyName: string
+): string {
+  const group = getCategoryGroup(category);
+  const templates = PLAIN_DESCRIPTIONS[group] ?? PLAIN_DESCRIPTIONS.object!;
+  return fillTemplate(pick(templates), category);
+}
+
+function generatePlainFunFact(
+  _city: CityProfile, _objectName: string, category: CategoryId, _fantasyName: string
+): string {
+  const group = getCategoryGroup(category);
+  const facts = PLAIN_FACTS[group] ?? PLAIN_FACTS.object!;
+  let result = pick(facts);
+  const habitats = ["亚洲", "欧洲", "南美洲", "热带地区", "温带地区", "高海拔地区"];
+  const seasons = ["春季", "夏季", "秋季", "冬季"];
+  result = result.replace(/\{val1\}/g, () => String(randInt(20, 500)));
+  result = result.replace(/\{p1\}/g, () => pick(["温和", "明显", "独特", "丰富", "良好", "稳定"]));
+  result = result.replace(/\{p2\}/g, () => String(randInt(2, 99)));
+  result = result.replace(/\{habitat\}/g, () => pick(habitats));
+  result = result.replace(/\{season\}/g, () => pick(seasons));
+  return result;
+}
+
 // ─── Public API ─────────────────────────────────────────────
 
 export function generateMockCard(
@@ -414,17 +466,17 @@ export function generateMockCard(
   category: CategoryId,
   imageUrl: string
 ): AtlasCard {
-  const fantasyName = generateFantasyName(city, objectName, category);
+  const plain = isPlainIntroMode(city.name);
 
   return {
     id: uid(),
     city: city.name,
     originalObjectName: objectName,
     category,
-    fantasyName,
-    description: generateDescription(city, objectName, category, fantasyName),
+    fantasyName: plain ? generatePlainName(city, objectName, category) : generateFantasyName(city, objectName, category),
+    description: plain ? generatePlainDescription(city, objectName, category, "") : generateDescription(city, objectName, category, ""),
     stats: generateStats(category),
-    funFact: generateFunFact(city, objectName, category, fantasyName),
+    funFact: plain ? generatePlainFunFact(city, objectName, category, "") : generateFunFact(city, objectName, category, ""),
     imageUrl,
     createdAt: new Date().toISOString(),
   };
@@ -433,14 +485,17 @@ export function generateMockCard(
 export function regenerateMockCard(original: AtlasCard, newFantasyName: string): AtlasCard {
   const city = CITIES.find((c) => c.name === original.city) ?? CITIES[0]!;
   const fantasyName = newFantasyName.trim() || original.fantasyName;
+  const plain = isPlainIntroMode(original.city);
 
   return {
     ...original,
     id: uid(),
     fantasyName,
-    description: generateDescription(city, original.originalObjectName, original.category as CategoryId, fantasyName),
+    description: plain ? generatePlainDescription(city, original.originalObjectName, original.category as CategoryId, fantasyName)
+      : generateDescription(city, original.originalObjectName, original.category as CategoryId, fantasyName),
     stats: generateStats(original.category as CategoryId),
-    funFact: generateFunFact(city, original.originalObjectName, original.category as CategoryId, fantasyName),
+    funFact: plain ? generatePlainFunFact(city, original.originalObjectName, original.category as CategoryId, fantasyName)
+      : generateFunFact(city, original.originalObjectName, original.category as CategoryId, fantasyName),
     createdAt: new Date().toISOString(),
   };
 }

@@ -278,3 +278,14 @@ export function resolveStyleProfile(input: string): CityProfile {
     statModifiers: [],
   };
 }
+
+/** Detect if the input is a plain/normal intro mode keyword. */
+const PLAIN_KEYWORDS = [
+  "普通介绍", "普通", "正常介绍", "写实介绍", "百科介绍",
+  "无风格", "plain", "normal",
+];
+
+export function isPlainIntroMode(styleSource: string): boolean {
+  const trimmed = styleSource.trim().toLowerCase();
+  return PLAIN_KEYWORDS.some((k) => trimmed === k.toLowerCase());
+}
