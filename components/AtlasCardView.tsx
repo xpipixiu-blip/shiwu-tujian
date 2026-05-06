@@ -90,7 +90,7 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
         {/* Card body — captured for export */}
         <div
           ref={cardRef}
-          className="relative card-stone card-gold-border noise-overlay card-corners"
+          className="relative card-stone card-gold-border"
           style={{ borderRadius: 4, padding: 16 }}
         >
           {/* 1. Cropped image — ~45% of card */}
