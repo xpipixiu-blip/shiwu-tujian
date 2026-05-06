@@ -3,7 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { toBlob, toPng } from "html-to-image";
 import type { AtlasCard as AtlasCardType, NumericStat, TextStat, CardPreset } from "@/lib/types";
-import { CategoryIcon, GameStar, EncycLeaf, EncycFlower } from "@/lib/card-icons";
+import { getCategoryEmoji, EmojiSpan } from "@/lib/emoji-icons";
 
 type Props = { card: AtlasCardType; onEdit: () => void; onClose?: () => void };
 
@@ -104,9 +104,9 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
 
   const preset = card.cardPreset ?? "antique";
   const t = THEMES[preset];
-  const showGameIcons = preset === "game";
-  const showEncycIcons = preset === "encyclopedia";
+  const showEmoji = preset === "game" || preset === "encyclopedia";
   const isLiquid = preset === "liquid-metal";
+  const catEmoji = showEmoji ? getCategoryEmoji(card.category as import("@/lib/types").CategoryId, preset) : "";
 
   const filename = `识物图鉴-${card.city}-${card.fantasyName}.png`.replace(/[\\/:*?"<>|]/g, "-").slice(0, 80);
   const imageSrc = card.croppedImageUrl || card.imageUrl;
@@ -165,8 +165,7 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
           {/* 2. Name row */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%", marginBottom: 4 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
-              {showGameIcons && <GameStar />}
-              {showEncycIcons && <EncycLeaf />}
+              {catEmoji && <EmojiSpan emoji={catEmoji} size={16} />}
               <h2 style={{ minWidth: 0, fontSize: 22, fontWeight: t.nameWeight, letterSpacing: isLiquid ? "0.12em" : "0.08em", lineHeight: 1.3, color: t.nameColor, fontFamily: t.nameFont }}>
                 {card.fantasyName}
               </h2>
@@ -178,9 +177,7 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
               writingMode: "horizontal-tb", wordBreak: "keep-all", overflowWrap: "normal",
               color: t.badgeColor, background: t.badgeBg, border: `1px solid ${t.badgeBorder}`, borderRadius: t.badgeRadius,
             }}>
-              {(showGameIcons || showEncycIcons) && (
-                <CategoryIcon category={card.category as import("@/lib/types").CategoryId} preset={preset} />
-              )}
+              {catEmoji && <EmojiSpan emoji={catEmoji} size={12} />}
               {isLiquid && (
                 <span style={{ display: "inline-block", width: 4, height: 10, background: t.badgeColor, borderRadius: 1, marginRight: 4, opacity: 0.6 }} />
               )}
@@ -191,7 +188,6 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
           {/* Divider */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", marginBottom: 12 }}>
             <div style={{ flex: 1, height: 1, background: t.dividerColor }} />
-            {showEncycIcons && <EncycFlower />}
             <div style={{ flex: 1, height: 1, background: t.dividerColor }} />
           </div>
 
@@ -208,12 +204,7 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
           {/* 5. Fun fact */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10 }}>
             <div style={{ flex: 1, height: 1, background: t.dividerColor }} />
-            {showGameIcons && (
-              <svg width="14" height="4" viewBox="0 0 14 4" fill="none" style={{ flexShrink: 0, opacity: 0.3 }}>
-                <path d="M0 2 L4 0 L7 2 L10 0 L14 2" stroke="currentColor" strokeWidth="0.8" fill="none" style={{ color: t.nameColor }} />
-              </svg>
-            )}
-            {showEncycIcons && <EncycFlower />}
+            {catEmoji && <EmojiSpan emoji={catEmoji} size={11} />}
             <div style={{ flex: 1, height: 1, background: t.dividerColor }} />
           </div>
           <p className="text-[12px] leading-relaxed" style={{ color: t.funColor }}>{card.funFact}</p>
