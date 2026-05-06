@@ -9,8 +9,9 @@ import EditModal from "@/components/EditModal";
 import HistoryList from "@/components/HistoryList";
 import ModelSelector from "@/components/ModelSelector";
 import ApiSettingsPanel from "@/components/ApiSettingsPanel";
+import CardPresetSelector from "@/components/CardPresetSelector";
 import type { CityProfile } from "@/lib/cities";
-import type { AtlasCard } from "@/lib/types";
+import type { AtlasCard, CardPreset } from "@/lib/types";
 import { loadCards, saveCard, deleteCard } from "@/lib/storage";
 import { loadModelId } from "@/lib/model-storage";
 import { resizeImageForUpload } from "@/lib/image-utils";
@@ -18,6 +19,7 @@ import { calculateCrop, cropImage } from "@/lib/crop-utils";
 import type { SubjectBox, CropBox } from "@/lib/crop-utils";
 import { loadByokConfig, saveByokConfig, clearByokConfig } from "@/lib/byok-storage";
 import type { ByokConfig } from "@/lib/byok-storage";
+import { loadPreset, savePreset } from "@/lib/preset-storage";
 
 type Detection = {
   subjectBox: SubjectBox;
@@ -50,6 +52,7 @@ export default function HomePage() {
 
   const [byokConfig, setByokConfig] = useState<ByokConfig | null>(null);
   const [showApiSettings, setShowApiSettings] = useState(false);
+  const [cardPreset, setCardPreset] = useState<CardPreset>("antique");
 
   const resizedBase64Ref = useRef<string | null>(null);
   const detectingRef = useRef(false);
@@ -68,6 +71,8 @@ export default function HomePage() {
     if (saved) setModelId(saved);
     const byok = loadByokConfig();
     if (byok) setByokConfig(byok);
+    const savedPreset = loadPreset();
+    if (savedPreset) setCardPreset(savedPreset);
   }, []);
 
   const resetCard = useCallback(() => { setCurrentCard(null); setGenerateError(null); }, []);
@@ -117,6 +122,7 @@ export default function HomePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "生成失败");
       const card = data.card as AtlasCard;
+      card.cardPreset = cardPreset;
       if (detection?.croppedImageUrl) card.croppedImageUrl = detection.croppedImageUrl;
       setCurrentCard(card);
     } catch (e) {
@@ -167,6 +173,15 @@ export default function HomePage() {
   }, []);
   const handleClearByok = useCallback(() => { setByokConfig(null); clearByokConfig(); }, []);
 
+  const handlePresetChange = useCallback((p: CardPreset) => {
+    setCardPreset(p);
+    savePreset(p);
+    // If card already exists, switch its preset without re-generating
+    if (currentCard) {
+      setCurrentCard({ ...currentCard, cardPreset: p });
+    }
+  }, [currentCard]);
+
   const handleHistorySelect = useCallback((card: AtlasCard) => {
     setCurrentCard(card); setCity(null); setImageFile(null); setGenerateError(null); setEditError(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -196,6 +211,7 @@ export default function HomePage() {
       <main className="flex-1 px-4 pb-8 max-w-lg mx-auto w-full space-y-5">
         {currentCard ? (
           <>
+            <CardPresetSelector value={currentCard.cardPreset ?? "antique"} onChange={handlePresetChange} />
             <div className="animate-fade-in">
               <AtlasCardView card={currentCard} onEdit={handleOpenEdit} onClose={() => setCurrentCard(null)} />
             </div>
@@ -210,6 +226,8 @@ export default function HomePage() {
             <ModelSelector value={modelId} onChange={setModelId}
               disabled={isGenerating || byokConfig?.enabled === true}
               showByokOverride={byokConfig?.enabled === true} byokModelId={byokConfig?.modelId} />
+            <CardPresetSelector value={cardPreset} onChange={handlePresetChange} disabled={isGenerating} />
+
             <CitySelector value={city} onChange={handleCityChange} disabled={isGenerating} />
             <PhotoUploader onImageSelect={handleImageSelect} disabled={isGenerating} />
             <ImagePreview file={imageFile} />
