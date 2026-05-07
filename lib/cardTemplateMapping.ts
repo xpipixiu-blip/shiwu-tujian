@@ -17,7 +17,7 @@ export type MockAtlasData = {
 
 /* ─── Content length guards ───────────────────────────── */
 
-const MAX_NAME_CHARS = 12;
+const MAX_NAME_CHARS = 7;
 const MAX_BIO_CHARS = 130;
 const MAX_INFO1_CHARS = 28;
 
@@ -32,39 +32,71 @@ function clampBio(text: string): string {
 }
 
 function clampInfoLine1(facts: Array<{ label: string; value: string }>): string {
-  // Try with all facts
-  const all = facts
+  // Always use exactly 2 facts
+  const two = facts.slice(0, 2);
+  const joined = two
     .map((f) => `${f.label}：${f.value}`)
     .join("　");
 
-  if (all.length <= MAX_INFO1_CHARS) return all;
+  if (joined.length <= MAX_INFO1_CHARS) return joined;
 
-  // Retry with 2 facts
-  const two = facts.slice(0, 2)
-    .map((f) => `${f.label}：${f.value}`)
-    .join("　");
-
-  if (two.length <= MAX_INFO1_CHARS) return two;
-
-  // Still too long: truncate each value
-  const trimmed = facts.slice(0, 2).map((f) => {
+  // Too long: truncate each value
+  const trimmed = two.map((f) => {
     const shortVal = f.value.length > 6 ? f.value.slice(0, 6) : f.value;
     return `${f.label}：${shortVal}`;
   }).join("　");
 
   if (trimmed.length <= MAX_INFO1_CHARS) return trimmed;
 
-  // Last resort: just 1 fact
-  const one = `${facts[0].label}：${facts[0].value.slice(0, 6)}`;
-  return one.length <= MAX_INFO1_CHARS ? one : one.slice(0, MAX_INFO1_CHARS - 1) + "…";
+  // Still too long: hard cap
+  return trimmed.slice(0, MAX_INFO1_CHARS - 1) + "…";
+}
+
+/** Units that suggest the value IS a score/rating, not a physical measurement */
+const SCORE_LIKE_UNITS = new Set(["", "分", "点", "%"]);
+
+/** Parse "400卡" → { value: 400, unit: "卡" }, "82分" → { value: 82, unit: "分" }, "85" → { value: 85 } */
+function parseStatValue(raw: string | number): { value: string | number; unit?: string } {
+  if (typeof raw === "number") return { value: raw };
+  const m = raw.match(/^(\d+(?:\.\d+)?)\s*(\S*)$/);
+  if (m) {
+    const num = m[1].includes(".") ? parseFloat(m[1]) : parseInt(m[1], 10);
+    const unit = m[2] || undefined;
+    return { value: num, unit };
+  }
+  return { value: raw };
 }
 
 function clampStatItems(items: TemplateStatItem[]): TemplateStatItem[] {
-  return items.slice(0, 2).map((s) => ({
-    label: s.label.length > 5 ? s.label.slice(0, 5) : s.label,
-    value: s.value.length > 8 ? s.value.slice(0, 8) : s.value,
-    score: s.score != null ? Math.min(100, Math.max(0, s.score)) : undefined,
-  }));
+  return items.slice(0, 2).map((s) => {
+    const parsed = parseStatValue(s.value);
+    const label = s.label.length > 5 ? s.label.slice(0, 5) : s.label;
+
+    // Score handling
+    let score = s.score;
+    if (score == null && typeof parsed.value === "number") {
+      const n = parsed.value as number;
+      if (n >= 0 && n <= 100) score = n;
+    }
+    if (score == null) score = 50;
+    score = Math.min(100, Math.max(0, score));
+
+    // Value/unit: if AI put the unit in `value` (non-numeric) and the number in `score`,
+    // swap them so value = score number, unit = original value string
+    let displayVal: string;
+    let unit: string | undefined;
+    if (typeof parsed.value === "string" && !/^\d/.test(String(s.value).trim())) {
+      // value is non-numeric text (e.g. "分贝", "克") → use score as display value, text as unit
+      displayVal = String(score);
+      unit = String(s.value).trim();
+    } else {
+      displayVal = String(parsed.value);
+      if (displayVal.length > 8) displayVal = displayVal.slice(0, 8);
+      unit = parsed.unit ?? s.unit;
+    }
+
+    return { label, value: displayVal, unit, score };
+  });
 }
 
 /* ─── Helpers ─────────────────────────────────────────── */
@@ -80,6 +112,7 @@ function stripFunFactPrefix(text: string): string {
 export function mapToTemplateModel(data: MockAtlasData): TemplateRenderModel {
   const cleanFunFact = stripFunFactPrefix(data.funFact);
 
+  // mapToTemplateModel
   const statItems: TemplateStatItem[] = data.stats.map((s) => ({
     label: s.label,
     value: s.value,
@@ -168,10 +201,11 @@ export function mapAtlasCardToTemplateModel(
   const catEmoji = getCategoryEmoji(card.category as CategoryId, "game");
   const footerIcons = pickFooterIcons(card.category);
 
+  // mapAtlasCardToTemplateModel
   const statItems: TemplateStatItem[] = card.stats.map((s) => ({
     label: s.label,
     value: s.value,
-    score: s.type === "numeric" ? s.score : undefined,
+    score: s.type === "numeric" ? (s.score ?? (Number(s.value) >= 0 && Number(s.value) <= 100 ? Number(s.value) : undefined)) : undefined,
   }));
 
   return {

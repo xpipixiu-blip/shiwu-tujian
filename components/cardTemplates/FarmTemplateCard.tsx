@@ -223,7 +223,7 @@ function barColor(score: number, cfg: TemplateConfig["typography"]["statBar"]) {
   return cfg.lowColor;
 }
 
-function MiniStatBar({
+const MiniStatBar = React.memo(function MiniStatBar({
   stat,
   config,
 }: {
@@ -233,41 +233,67 @@ function MiniStatBar({
   const { designWidth: dw } = config;
   const barCfg = config.typography.statBar;
   const hasScore = stat.score != null;
-  const pct = hasScore ? stat.score! : 50;
+  const pct = hasScore ? Math.min(100, Math.max(0, stat.score!)) : 0;
+
+  const displayValue = stat.unit
+    ? `${stat.value}${stat.unit}`
+    : String(stat.value);
 
   return (
     <span
       style={{
         display: "inline-flex",
-        alignItems: "center",
-        gap: `${(30 / dw) * 100}cqi`,
-        flexShrink: 0,
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: `${(12 / dw) * 100}cqi`,
+        flex: "1 1 0",
+        minWidth: 0,
       }}
     >
-      {/* Label */}
+      {/* Label + value — always visible */}
       <span
         style={{
-          fontFamily: FONT_FAMILY,
-          fontSize: fs(72, dw),
-          color: barCfg.labelColor,
-          lineHeight: 1,
-          whiteSpace: "nowrap",
+          display: "inline-flex",
+          alignItems: "baseline",
+          gap: `${(24 / dw) * 100}cqi`,
+          width: "100%",
         }}
       >
-        {stat.label}
+        <span
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: fs(66, dw),
+            color: barCfg.labelColor,
+            lineHeight: 1,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {stat.label}
+        </span>
+        <span
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: fs(66, dw),
+            color: barCfg.valueColor,
+            fontWeight: 600,
+            lineHeight: 1,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {displayValue}
+        </span>
       </span>
 
-      {/* Bar */}
+      {/* Progress bar — only when score exists */}
       {hasScore ? (
         <span
           style={{
-            display: "inline-block",
-            width: `${(260 / dw) * 100}cqi`,
+            display: "block",
+            width: "100%",
             height: fs(barCfg.height, dw),
             background: barCfg.trackColor,
             borderRadius: `${(4 / dw) * 100}cqi`,
             overflow: "hidden",
-            flexShrink: 0,
           }}
         >
           <span
@@ -281,29 +307,75 @@ function MiniStatBar({
           />
         </span>
       ) : (
+        /* No score: invisible spacer to keep alignment */
         <span
           style={{
-            display: "inline-block",
-            width: `${(120 / dw) * 100}cqi`,
-            flexShrink: 0,
+            display: "block",
+            width: "100%",
+            height: fs(barCfg.height, dw),
+            background: "transparent",
           }}
         />
       )}
+    </span>
+  );
+});
 
-      {/* Value */}
+/* ─── Portrait sub-components ────────────────────────── */
+
+function PortraitImage({ src, dw }: { src: string; dw: number }) {
+  const [errored, setErrored] = React.useState(false);
+
+  if (errored) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[Template] portrait image failed to load, src prefix:", src.slice(0, 80));
+    }
+    return <PortraitPlaceholder dw={dw} />;
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        objectPosition: "center",
+        display: "block",
+      }}
+      draggable={false}
+      onError={() => setErrored(true)}
+    />
+  );
+}
+
+function PortraitPlaceholder({ dw }: { dw: number }) {
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        background:
+          "linear-gradient(135deg, rgba(139,107,90,0.15), rgba(139,107,90,0.05))",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: `${(20 / dw) * 100}cqi`,
+      }}
+    >
+      <span style={{ fontSize: fs(100, dw), opacity: 0.2 }}>🖼</span>
       <span
         style={{
           fontFamily: FONT_FAMILY,
-          fontSize: fs(72, dw),
-          color: barCfg.valueColor,
-          fontWeight: 600,
-          lineHeight: 1,
-          whiteSpace: "nowrap",
+          fontSize: fs(48, dw),
+          color: "rgba(139,107,90,0.5)",
         }}
       >
-        {stat.value}
+        暂无裁切图片
       </span>
-    </span>
+    </div>
   );
 }
 
@@ -331,6 +403,8 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
       });
     }
 
+    const bgSrc = config.backgroundImagePreview || config.backgroundImage;
+
     return (
       <div
         ref={ref}
@@ -344,8 +418,10 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
       >
         {/* ── Layer 0: Background ─────────────────────── */}
         <img
-          src={config.backgroundImage}
+          data-template-bg="true"
+          src={bgSrc}
           alt=""
+          crossOrigin="anonymous"
           style={{
             position: "absolute",
             inset: 0,
@@ -403,38 +479,9 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
                 }}
               >
                 {model.portraitImageUrl ? (
-                  <img
-                    src={model.portraitImageUrl}
-                    alt=""
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      objectPosition: "center",
-                    }}
-                    draggable={false}
-                  />
+                  <PortraitImage src={model.portraitImageUrl} dw={dw} />
                 ) : (
-                  <div
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      background:
-                        "linear-gradient(135deg, rgba(139,107,90,0.15), rgba(139,107,90,0.05))",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: fs(100, dw),
-                        opacity: 0.2,
-                      }}
-                    >
-                      🖼
-                    </span>
-                  </div>
+                  <PortraitPlaceholder dw={dw} />
                 )}
               </div>
             </div>
@@ -550,9 +597,9 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
               ...rectStyle(slots.info2, dw, dh),
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
+              justifyContent: "space-evenly",
               overflow: "hidden",
-              gap: `${(80 / dw) * 100}cqi`,
+              gap: `${(50 / dw) * 100}cqi`,
               paddingLeft: pw(slots.info2.padding.left, dw),
               paddingRight: pw(slots.info2.padding.right, dw),
             }}

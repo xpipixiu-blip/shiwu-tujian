@@ -5,7 +5,9 @@ export const farmTemplateConfig: TemplateConfig = {
   label: "像素农场风卡面",
   designWidth: 3000,
   designHeight: 4000,
-  backgroundImage: "/templates/farm-card-v1.png",
+  backgroundImage: "/templates/farm-card-v1.preview.webp",
+  backgroundImagePreview: "/templates/farm-card-v1.preview.webp",
+  backgroundImageExport: "/templates/farm-card-v1.png",
 
   /* ═══════════════════════════════════════════════════════
      Typography — all font sizes in design coordinates.
@@ -28,13 +30,13 @@ export const farmTemplateConfig: TemplateConfig = {
       fontWeight: 600,
     },
     info1: {
-      fontSize: 96,
+      fontSize: 90,
       lineHeight: 1.25,
       color: "#4a3020",
       fontWeight: 400,
     },
     info2: {
-      fontSize: 90,
+      fontSize: 96,
       lineHeight: 1.25,
       color: "#4a3020",
       fontWeight: 400,
@@ -120,9 +122,9 @@ export const farmTemplateConfig: TemplateConfig = {
        Stats — single line.
     */
     info2: {
-      x: 280,
+      x: 420,
       y: 2650,
-      w: 2400,
+      w: 2300,
       h: 250,
       padding: { top: 0, right: 36, bottom: 0, left: 36 },
     },

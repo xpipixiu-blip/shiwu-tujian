@@ -11,14 +11,17 @@ export type TextStat = {
   value: string;
 };
 
-export type CardPreset = "game" | "antique" | "liquid-metal" | "encyclopedia" | "farm-template";
+export type CardPreset = "game" | "antique" | "liquid-metal" | "encyclopedia" | "farm-template" | "museum-card" | "rainbow-card" | "sleek-card";
 
 export const CARD_PRESETS: { id: CardPreset; label: string }[] = [
   { id: "antique", label: "古董图鉴风" },
   { id: "game", label: "游戏风" },
   { id: "liquid-metal", label: "液态金属风" },
   { id: "encyclopedia", label: "自然百科风" },
-  { id: "farm-template", label: "像素农场模板" },
+  { id: "farm-template", label: "像素农场" },
+  { id: "museum-card", label: "古物馆藏" },
+  { id: "rainbow-card", label: "彩虹稀有" },
+  { id: "sleek-card", label: "拉丝金属" },
 ];
 
 export type AtlasCard = {

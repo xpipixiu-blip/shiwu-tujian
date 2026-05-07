@@ -13,7 +13,10 @@
       "Bash(head -5 /tmp/test-output.html)",
       "Bash(pkill -f \"next dev\")",
       "Bash(netstat -ano)",
-      "Bash(taskkill //PID 59664 //F)"
+      "Bash(taskkill //PID 59664 //F)",
+      "Bash(node *)",
+      "Bash(npm install *)",
+      "Bash(taskkill //PID 59364 //F)"
     ]
   }
 }

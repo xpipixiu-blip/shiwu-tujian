@@ -27,8 +27,9 @@ export type SlotTypography = {
 
 export type TemplateStatItem = {
   label: string;
-  value: string;
-  score?: number; // 0-100, only numeric stats have scores
+  value: string | number;
+  unit?: string;
+  score?: number; // 0-100，进度条百分比
 };
 
 export type TemplateRenderModel = {
@@ -50,6 +51,8 @@ export type TemplateConfig = {
   designWidth: number;
   designHeight: number;
   backgroundImage: string;
+  backgroundImagePreview?: string;
+  backgroundImageExport?: string;
 
   typography: {
     name: SlotTypography;

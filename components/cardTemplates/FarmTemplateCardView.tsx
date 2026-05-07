@@ -1,35 +1,44 @@
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
-import { toBlob, toPng } from "html-to-image";
 import FarmTemplateCard from "@/components/cardTemplates/FarmTemplateCard";
 import { farmTemplateConfig } from "@/lib/farmTemplateConfig";
+import { getTemplateConfig } from "@/lib/templateConfigs";
 import { mapAtlasCardToTemplateModel } from "@/lib/cardTemplateMapping";
 import type { AtlasCard } from "@/lib/types";
 
 const PERF = process.env.NODE_ENV === "development";
-
 function logPerf(label: string, start: number) {
   if (PERF) console.log(`[Template Perf] ${label}: ${(performance.now() - start).toFixed(1)}ms`);
 }
 
-/* ─── Template background preloader ───────────────────── */
-/* Singleton: load once, reuse across mounts. */
+/* ─── Template image cache ─────────────────────────────── */
 
-let bgPreloadPromise: Promise<void> | null = null;
-let bgPreloaded = false;
+type CacheEntry = { loaded: boolean; promise: Promise<void> | null };
+const imageCache = new Map<string, CacheEntry>();
 
-function ensureBgPreloaded(): Promise<void> {
-  if (bgPreloaded) return Promise.resolve();
-  if (bgPreloadPromise) return bgPreloadPromise;
+function preloadImage(url: string): Promise<void> {
+  const existing = imageCache.get(url);
+  if (existing?.loaded) return Promise.resolve();
+  if (existing?.promise) return existing.promise;
 
-  bgPreloadPromise = new Promise<void>((resolve) => {
+  const entry: CacheEntry = { loaded: false, promise: null };
+  entry.promise = new Promise<void>((resolve) => {
     const img = new Image();
-    img.onload = () => { bgPreloaded = true; resolve(); };
-    img.onerror = () => { bgPreloaded = true; resolve(); }; // still resolve, card shows error
-    img.src = farmTemplateConfig.backgroundImage;
+    img.onload = () => { entry.loaded = true; resolve(); };
+    img.onerror = () => { entry.loaded = true; resolve(); };
+    img.src = url;
+    // Try to decode immediately if supported
+    if (img.decode) {
+      img.decode().then(() => { entry.loaded = true; resolve(); }).catch(() => {});
+    }
   });
-  return bgPreloadPromise;
+  imageCache.set(url, entry);
+  return entry.promise;
+}
+
+function isImageCached(url: string): boolean {
+  return imageCache.get(url)?.loaded === true;
 }
 
 /* ─── Component ───────────────────────────────────────── */
@@ -40,48 +49,62 @@ type Props = {
   onClose?: () => void;
 };
 
-export default function FarmTemplateCardView({ card, onEdit, onClose }: Props) {
+function FarmTemplateCardViewInner({ card, onEdit, onClose }: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [imageMissing, setImageMissing] = useState(false);
-  const [bgReady, setBgReady] = useState(bgPreloaded);
+  const [bgReady, setBgReady] = useState(false);
+
+  const config = useMemo(
+    () => getTemplateConfig(card.cardPreset ?? "farm-template") ?? farmTemplateConfig,
+    [card.cardPreset],
+  );
+  const previewBg = config.backgroundImagePreview || config.backgroundImage;
+  const exportBg = config.backgroundImageExport || config.backgroundImage;
 
   useEffect(() => {
     setIsMobile("ontouchstart" in window || navigator.maxTouchPoints > 0);
   }, []);
 
-  // Preload template background
+  // Preload both preview and export backgrounds
   useEffect(() => {
-    if (bgPreloaded) return;
     const t0 = performance.now();
-    ensureBgPreloaded().then(() => {
-      logPerf("background preloaded", t0);
+    const cached = isImageCached(previewBg);
+    preloadImage(previewBg).then(() => {
+      if (!cached) logPerf("bg preview preloaded", t0);
       setBgReady(true);
     });
-  }, []);
+    // Also warm export image in background
+    if (exportBg !== previewBg && !isImageCached(exportBg)) {
+      preloadImage(exportBg);
+    }
+  }, [previewBg, exportBg]);
 
-  // Pre-check template image (one-shot)
+  // Check template image exists
   useEffect(() => {
     const img = new Image();
     img.onload = () => setImageMissing(false);
     img.onerror = () => setImageMissing(true);
-    img.src = farmTemplateConfig.backgroundImage;
-  }, []);
+    img.src = previewBg;
+  }, [previewBg]);
 
-  // Memoize the mapping — only re-run when card data actually changes
-  const tMap0 = performance.now();
+  // Memoize model mapping — uses original croppedImageUrl directly
   const model = useMemo(() => {
     const t0 = performance.now();
     const m = mapAtlasCardToTemplateModel(card);
-    logPerf("mapAtlasCardToTemplateModel", t0);
+    if (PERF) {
+      logPerf("mapToTemplateModel", t0);
+      console.log("[Template Debug] statItems from AtlasCard:", JSON.stringify(m.statItems));
+      console.log("[Template Debug] raw card.stats:", JSON.stringify(card.stats));
+    }
     return m;
-  }, [card.id, card.fantasyName, card.category, card.description,
-      card.funFact, card.croppedImageUrl, card.imageUrl,
-      // Facts / stats are compared by structural hash via JSON
-      JSON.stringify(card.facts), JSON.stringify(card.stats)]);
-  logPerf("FarmTemplateCardView render (after useMemo)", tMap0);
+  }, [
+    card.id, card.fantasyName, card.category, card.description,
+    card.funFact, card.croppedImageUrl, card.imageUrl,
+    JSON.stringify(card.facts), JSON.stringify(card.stats),
+  ]);
 
   const safeName = card.fantasyName.replace(/[\\/:*?"<>|]/g, "-").slice(0, 40);
   const filename = `${safeName}-farm-card.png`;
@@ -92,13 +115,33 @@ export default function FarmTemplateCardView({ card, onEdit, onClose }: Props) {
     setIsSaving(true);
     setSaveError(null);
 
+    // Dynamic import — html-to-image only loads when user clicks export
+    const { toBlob, toPng } = await import("html-to-image");
+
+    // Swap background to export-quality image if different
+    const bgImg = cardRef.current.querySelector<HTMLImageElement>("[data-template-bg]");
+    const origSrc = bgImg?.src ?? "";
+    let swapped = false;
+
+    if (bgImg && exportBg !== previewBg) {
+      // Preload export image if not cached
+      await preloadImage(exportBg);
+      bgImg.src = exportBg;
+      await new Promise<void>((resolve) => {
+        if (bgImg.complete) { resolve(); return; }
+        bgImg.onload = () => resolve();
+        bgImg.onerror = () => resolve();
+      });
+      swapped = true;
+    }
+
     try {
       const cardEl = cardRef.current;
       const displayWidth = cardEl.offsetWidth;
       const targetWidth = 1500;
       const pixelRatio = targetWidth / displayWidth;
 
-      logPerf("export start", t0);
+      logPerf("export toBlob start", t0);
       const blob = await toBlob(cardEl, { pixelRatio });
       logPerf("export toBlob done", t0);
       if (!blob) throw new Error("生成图片失败");
@@ -119,32 +162,36 @@ export default function FarmTemplateCardView({ card, onEdit, onClose }: Props) {
       link.click();
       document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(url), 3000);
-      setIsSaving(false);
       logPerf("export complete", t0);
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") {
-        setIsSaving(false);
-        return;
-      }
-      try {
-        const dataUrl = await toPng(cardRef.current, { pixelRatio: 1500 / (cardRef.current?.offsetWidth || 420) });
-        const w = window.open("");
-        if (w) {
-          w.document.write(
-            `<html><body style="margin:0;background:#0b0a08;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;"><img src="${dataUrl}" style="max-width:100%;max-height:90dvh;border-radius:4px;" /><p style="color:#8b8076;font-size:14px;font-family:sans-serif;margin-top:12px;">长按图片保存到相册</p></body></html>`,
-          );
-        } else {
-          setSaveError("弹出窗口被拦截");
+        // user cancelled share — ignore
+      } else {
+        try {
+          const dataUrl = await toPng(cardRef.current, { pixelRatio: 1500 / (cardRef.current?.offsetWidth || 420) });
+          const w = window.open("");
+          if (w) {
+            w.document.write(
+              `<html><body style="margin:0;background:#0b0a08;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;"><img src="${dataUrl}" style="max-width:100%;max-height:90dvh;border-radius:4px;" /><p style="color:#8b8076;font-size:14px;font-family:sans-serif;margin-top:12px;">长按图片保存到相册</p></body></html>`,
+            );
+          } else {
+            setSaveError("弹出窗口被拦截");
+          }
+        } catch {
+          setSaveError("保存失败，请截图保存");
         }
-      } catch {
-        setSaveError("保存失败，请截图保存");
+        logPerf("export fallback done", t0);
+      }
+    } finally {
+      // Restore preview background
+      if (swapped && bgImg) {
+        bgImg.src = origSrc;
       }
       setIsSaving(false);
-      logPerf("export fallback done", t0);
     }
-  }, [filename]);
+  }, [filename, previewBg, exportBg]);
 
-  // Template image missing state
+  // Template image missing
   if (imageMissing) {
     return (
       <div className="flex justify-center">
@@ -161,16 +208,14 @@ export default function FarmTemplateCardView({ card, onEdit, onClose }: Props) {
           <p className="text-xs mt-2" style={{ color: "#8b8076" }}>
             请检查 public/templates/farm-card-v1.png
           </p>
-          <div className="flex gap-2 mt-4 justify-center">
-            {onClose && (
-              <button
-                onClick={onClose}
-                className="px-4 py-2 rounded text-xs font-medium border border-ink-600 text-warm-200 hover:border-gold-500/30 transition-colors"
-              >
-                关闭
-              </button>
-            )}
-          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="mt-4 px-4 py-2 rounded text-xs font-medium border border-ink-600 text-warm-200 hover:border-gold-500/30 transition-colors"
+            >
+              关闭
+            </button>
+          )}
         </div>
       </div>
     );
@@ -179,14 +224,13 @@ export default function FarmTemplateCardView({ card, onEdit, onClose }: Props) {
   return (
     <div className="flex justify-center">
       <div className="relative w-full max-w-[420px] mx-auto">
-        {/* ── Card body ──────────────────────────────── */}
         <FarmTemplateCard
           ref={cardRef}
           model={model}
-          config={farmTemplateConfig}
+          config={config}
         />
 
-        {/* ── Action buttons ─────────────────────────── */}
+        {/* Action buttons */}
         <div className="flex gap-2 mt-3">
           {onClose && (
             <button
@@ -235,3 +279,5 @@ export default function FarmTemplateCardView({ card, onEdit, onClose }: Props) {
     </div>
   );
 }
+
+export default React.memo(FarmTemplateCardViewInner);
