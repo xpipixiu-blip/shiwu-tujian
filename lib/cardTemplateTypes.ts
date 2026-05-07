@@ -25,13 +25,19 @@ export type SlotTypography = {
   fontWeight?: number | string;
 };
 
+export type TemplateStatItem = {
+  label: string;
+  value: string;
+  score?: number; // 0-100, only numeric stats have scores
+};
+
 export type TemplateRenderModel = {
   nameText: string;
   badgeText: string;
   badgeIcon?: string;
   portraitImageUrl: string;
   infoLine1: string;
-  infoLine2: string;
+  statItems: TemplateStatItem[];
   bioText: string;
   footerIcons: Array<{ icon: string }>;
 };
@@ -51,6 +57,15 @@ export type TemplateConfig = {
     badgeText: SlotTypography;
     info1: SlotTypography;
     info2: SlotTypography;
+    statBar: {
+      height: number;
+      trackColor: string;
+      highColor: string;
+      midColor: string;
+      lowColor: string;
+      labelColor: string;
+      valueColor: string;
+    };
     bio: SlotTypography;
     footerIcon: { fontSize: number };
   };

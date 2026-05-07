@@ -8,6 +8,7 @@ import type {
   TemplateCircleSlot,
   SlotInset,
   DebugMode,
+  TemplateStatItem,
 } from "@/lib/cardTemplateTypes";
 
 /* ─── Coordinate helpers ──────────────────────────────── */
@@ -214,6 +215,98 @@ function DebugOverlay({
   );
 }
 
+/* ─── Mini stat bar ─────────────────────────────────── */
+
+function barColor(score: number, cfg: TemplateConfig["typography"]["statBar"]) {
+  if (score >= 75) return cfg.highColor;
+  if (score >= 45) return cfg.midColor;
+  return cfg.lowColor;
+}
+
+function MiniStatBar({
+  stat,
+  config,
+}: {
+  stat: TemplateStatItem;
+  config: TemplateConfig;
+}) {
+  const { designWidth: dw } = config;
+  const barCfg = config.typography.statBar;
+  const hasScore = stat.score != null;
+  const pct = hasScore ? stat.score! : 50;
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: `${(30 / dw) * 100}cqi`,
+        flexShrink: 0,
+      }}
+    >
+      {/* Label */}
+      <span
+        style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: fs(72, dw),
+          color: barCfg.labelColor,
+          lineHeight: 1,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {stat.label}
+      </span>
+
+      {/* Bar */}
+      {hasScore ? (
+        <span
+          style={{
+            display: "inline-block",
+            width: `${(260 / dw) * 100}cqi`,
+            height: fs(barCfg.height, dw),
+            background: barCfg.trackColor,
+            borderRadius: `${(4 / dw) * 100}cqi`,
+            overflow: "hidden",
+            flexShrink: 0,
+          }}
+        >
+          <span
+            style={{
+              display: "block",
+              width: `${pct}%`,
+              height: "100%",
+              background: barColor(pct, barCfg),
+              borderRadius: `${(4 / dw) * 100}cqi`,
+            }}
+          />
+        </span>
+      ) : (
+        <span
+          style={{
+            display: "inline-block",
+            width: `${(120 / dw) * 100}cqi`,
+            flexShrink: 0,
+          }}
+        />
+      )}
+
+      {/* Value */}
+      <span
+        style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: fs(72, dw),
+          color: barCfg.valueColor,
+          fontWeight: 600,
+          lineHeight: 1,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {stat.value}
+      </span>
+    </span>
+  );
+}
+
 /* ─── Card component ──────────────────────────────────── */
 
 type Props = {
@@ -226,6 +319,17 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
   ({ model, config, debugMode }, ref) => {
     const { designWidth: dw, designHeight: dh, slots, typography: t } = config;
     const hideContent = debugMode === "slots-only";
+    const mountTime = React.useRef(0);
+
+    // Log first-render timing
+    if (typeof window !== "undefined" && mountTime.current === 0) {
+      mountTime.current = performance.now();
+      requestAnimationFrame(() => {
+        if (process.env.NODE_ENV === "development") {
+          console.log("[Template Perf] FarmTemplateCard first paint:", (performance.now() - mountTime.current).toFixed(1) + "ms");
+        }
+      });
+    }
 
     return (
       <div
@@ -250,6 +354,11 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
             objectFit: "fill",
           }}
           draggable={false}
+          onLoad={() => {
+            if (process.env.NODE_ENV === "development") {
+              console.log("[Template Perf] background image loaded");
+            }
+          }}
           onError={(e) => {
             const el = e.currentTarget;
             el.style.display = "none";
@@ -434,7 +543,7 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
           </div>
         )}
 
-        {/* ── Layer 5: Info line 2 ────────────────────── */}
+        {/* ── Layer 5: Stat bars ──────────────────────── */}
         {!hideContent && (
           <div
             style={{
@@ -443,25 +552,14 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
               alignItems: "center",
               justifyContent: "center",
               overflow: "hidden",
+              gap: `${(80 / dw) * 100}cqi`,
               paddingLeft: pw(slots.info2.padding.left, dw),
               paddingRight: pw(slots.info2.padding.right, dw),
             }}
           >
-            <span
-              style={{
-                fontFamily: FONT_FAMILY,
-                fontSize: fs(t.info2.fontSize, dw),
-                color: t.info2.color,
-                lineHeight: t.info2.lineHeight,
-                fontWeight: t.info2.fontWeight,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                maxWidth: "100%",
-              }}
-            >
-              {model.infoLine2}
-            </span>
+            {model.statItems.map((stat, i) => (
+              <MiniStatBar key={i} stat={stat} config={config} />
+            ))}
           </div>
         )}
 
@@ -530,4 +628,4 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
 
 FarmTemplateCard.displayName = "FarmTemplateCard";
 
-export default FarmTemplateCard;
+export default React.memo(FarmTemplateCard);

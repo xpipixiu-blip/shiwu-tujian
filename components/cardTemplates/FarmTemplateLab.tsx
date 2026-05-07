@@ -25,9 +25,9 @@ const MOCK_DATA: MockAtlasData = {
     { label: "营养", value: "维生素C丰富" },
   ],
   stats: [
-    { label: "甜度", value: "85" },
-    { label: "水分", value: "72" },
-    { label: "口感", value: "柔软多汁" },
+    { label: "甜度", value: "85", score: 85 },
+    { label: "脆爽", value: "72", score: 72 },
+    { label: "香气", value: "68", score: 68 },
   ],
   description:
     "春末成熟的鲜红果实，带着清晨露水与泥土的甜香，常被视作农园里最温柔的收获。",

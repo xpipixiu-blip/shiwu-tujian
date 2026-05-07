@@ -18,8 +18,8 @@ async function regenerateContent(
 
   const userPrompt = plain ? `请为以下物体重新生成普通介绍。
 物体：${objectName} / 分类：${category} / 新名称：${newFantasyName}
-返回 JSON：{ "fantasyName": "${newFantasyName}", "description": "1-2句普通介绍（≤60字）", "stats": [ { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 50 }, { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 70 }, { "type": "text", "label": "属性（≤4字）", "value": "值（≤6字）" } ], "funFact": "1句真实小知识（≤40字）" }
-规则 - fantasyName 不修改 - description：客观自然 - stats：恰好3条 - funFact：真实冷知识 - 只输出 JSON`
+返回 JSON：{ "fantasyName": "${newFantasyName}", "description": "1-2句普通介绍（≤60字）", "stats": [ { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 50 }, { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 70 }, { "type": "text", "label": "属性（≤4字）", "value": "值（≤6字）" } ], "funFact": "1句真实小知识（≤40字）", "facts": [ { "label": "事实标签（≤6字）", "value": "事实内容（≤10字）" }, { "label": "事实标签（≤6字）", "value": "事实内容（≤10字）" } ] }
+规则 - fantasyName 不修改 - description：客观自然 - stats：恰好3条 - funFact：真实冷知识 - facts：2-3条该物品的客观事实维度 - 只输出 JSON`
     : `请为以下物体重新生成图鉴卡片内容。
 
 设定氛围
@@ -28,13 +28,14 @@ ${sp.moodKeywords.length ? `- 吸收这些气质：${sp.moodKeywords.join("、")
 - 物体：${objectName} / 分类：${category}
 - 用户新名称：${newFantasyName}
 
-返回 JSON：{ "fantasyName": "${newFantasyName}", "description": "1-2句（≤60字）", "stats": [ { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 50 }, { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 70 }, { "type": "text", "label": "属性（≤4字）", "value": "值（≤6字）" } ], "funFact": "1句（≤40字）" }
+返回 JSON：{ "fantasyName": "${newFantasyName}", "description": "1-2句（≤60字）", "stats": [ { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 50 }, { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 70 }, { "type": "text", "label": "属性（≤4字）", "value": "值（≤6字）" } ], "funFact": "1句（≤40字）", "facts": [ { "label": "事实标签（≤6字）", "value": "事实内容（≤10字）" }, { "label": "事实标签（≤6字）", "value": "事实内容（≤10字）" } ] }
 
 要求
 - fantasyName 不修改
 - description：围绕物体幻想特质，${sp.avoidNames.length ? `严禁包含：${sp.avoidNames.join("、")}` : "严禁出现地名或专有名词"}，≤60字
 - stats：恰好3条，2+1，label ≤4字，贴合设定氛围和物体类别
 - funFact：≤40字，轻轻融入设定气质，克制自然
+- facts：2-3条该物品的客观事实维度，根据分类选择合适维度。风格化模式下仍然是真实事实
 - 吸收气质，不堆名词
 - 只输出 JSON`;
 
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
 
   try {
     const content = await regenerateContent(sp, originalObjectName, category, userEditedFantasyName, effectiveModelId, plain, byok);
-    return NextResponse.json({ fantasyName: content.fantasyName, description: content.description, stats: content.stats, funFact: content.funFact });
+    return NextResponse.json({ fantasyName: content.fantasyName, description: content.description, stats: content.stats, funFact: content.funFact, facts: content.facts });
   } catch (e) {
     if (e instanceof ApiError) return NextResponse.json({ error: e.message, details: e.details }, { status: e.status });
     if (e instanceof SyntaxError) return NextResponse.json({ error: "AI 返回了无效的 JSON", details: e.message }, { status: 502 });

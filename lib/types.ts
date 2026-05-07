@@ -11,13 +11,14 @@ export type TextStat = {
   value: string;
 };
 
-export type CardPreset = "game" | "antique" | "liquid-metal" | "encyclopedia";
+export type CardPreset = "game" | "antique" | "liquid-metal" | "encyclopedia" | "farm-template";
 
 export const CARD_PRESETS: { id: CardPreset; label: string }[] = [
   { id: "antique", label: "古董图鉴风" },
   { id: "game", label: "游戏风" },
   { id: "liquid-metal", label: "液态金属风" },
   { id: "encyclopedia", label: "自然百科风" },
+  { id: "farm-template", label: "像素农场模板" },
 ];
 
 export type AtlasCard = {
@@ -29,6 +30,7 @@ export type AtlasCard = {
   description: string;
   stats: Array<NumericStat | TextStat>;
   funFact: string;
+  facts?: Array<{ label: string; value: string }>;
   imageUrl: string;
   croppedImageUrl?: string;
   cardPreset?: CardPreset;

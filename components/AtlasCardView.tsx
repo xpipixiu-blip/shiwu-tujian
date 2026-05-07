@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { toBlob, toPng } from "html-to-image";
 import type { AtlasCard as AtlasCardType, NumericStat, TextStat, CardPreset } from "@/lib/types";
 import { getCategoryEmoji, EmojiSpan } from "@/lib/emoji-icons";
+import FarmTemplateCardView from "@/components/cardTemplates/FarmTemplateCardView";
 
 type Props = { card: AtlasCardType; onEdit: () => void; onClose?: () => void };
 
@@ -21,7 +22,7 @@ type Theme = {
   cardBorder: string; cardOutline: string; cardOutlineOffset: number; cardShadow: string;
 };
 
-const THEMES: Record<CardPreset, Theme> = {
+const THEMES: Record<Exclude<CardPreset, "farm-template">, Theme> = {
   antique: {
     bg: "#17130f", bgHex: "#17130f",
     nameColor: "#c7aa67", nameFont: "var(--font-display), serif", nameWeight: 700,
@@ -110,6 +111,12 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
   useEffect(() => { setIsMobile("ontouchstart" in window || navigator.maxTouchPoints > 0); }, []);
 
   const preset = card.cardPreset ?? "antique";
+
+  // Farm template delegates to its own renderer
+  if (preset === "farm-template") {
+    return <FarmTemplateCardView card={card} onEdit={onEdit} onClose={onClose} />;
+  }
+
   const t = THEMES[preset];
   const showEmoji = preset === "game" || preset === "encyclopedia";
   const isLiquid = preset === "liquid-metal";

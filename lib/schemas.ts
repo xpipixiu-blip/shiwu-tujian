@@ -13,6 +13,11 @@ export const textStatSchema = z.object({
   value: z.string().min(1).max(10),
 });
 
+export const factSchema = z.object({
+  label: z.string().min(1).max(8),
+  value: z.string().min(1).max(14),
+});
+
 export const atlasCardContentSchema = z.object({
   fantasyName: z.string().min(2).max(12),
   description: z.string().min(1).max(60),
@@ -28,6 +33,7 @@ export const atlasCardContentSchema = z.object({
       { message: "需要恰好 2 条 numeric 和 1 条 text 属性" }
     ),
   funFact: z.string().min(1).max(40),
+  facts: z.array(factSchema).min(2).max(3),
 });
 
 export const analysisResultSchema = z.object({

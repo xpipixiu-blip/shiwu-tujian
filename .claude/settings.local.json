@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git checkout *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(curl *)",
+      "Bash(kill %1)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(npx next *)",
+      "Bash(wc -c /tmp/test-output.html)",
+      "Bash(head -5 /tmp/test-output.html)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //PID 59664 //F)"
+    ]
+  }
+}

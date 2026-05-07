@@ -161,6 +161,7 @@ export default function HomePage() {
         description: data.description ?? currentCard.description,
         stats: data.stats ?? currentCard.stats,
         funFact: data.funFact ?? currentCard.funFact,
+        facts: data.facts ?? currentCard.facts,
         createdAt: new Date().toISOString(),
       });
     } catch (e) {

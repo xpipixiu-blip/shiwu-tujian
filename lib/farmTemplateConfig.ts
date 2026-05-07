@@ -22,7 +22,7 @@ export const farmTemplateConfig: TemplateConfig = {
       fontSize: 290,
     },
     badgeText: {
-      fontSize: 102,
+      fontSize: 72,
       lineHeight: 1.2,
       color: "#4a3020",
       fontWeight: 600,
@@ -38,6 +38,15 @@ export const farmTemplateConfig: TemplateConfig = {
       lineHeight: 1.25,
       color: "#4a3020",
       fontWeight: 400,
+    },
+    statBar: {
+      height: 28,
+      trackColor: "rgba(139,107,90,0.18)",
+      highColor: "#7a5038",
+      midColor: "#8c6045",
+      lowColor: "#a07050",
+      labelColor: "#4a3020",
+      valueColor: "#3b2a1a",
     },
     bio: {
       fontSize: 88,
@@ -84,10 +93,10 @@ export const farmTemplateConfig: TemplateConfig = {
        where user photos will be placed.
     */
     portrait: {
-      x: 260,
-      y: 975,
-      w: 2500,
-      h: 1400,
+      x: 220,
+      y: 958,
+      w: 2775,
+      h: 2400,
     },
     portraitInset: {
       top: 44,
@@ -125,9 +134,9 @@ export const farmTemplateConfig: TemplateConfig = {
     */
     bio: {
       x: 340,
-      y: 3000,
+      y: 2950,
       w: 2320,
-      h: 450,
+      h: 550,
       padding: { top: 20, right: 40, bottom: 16, left: 40 },
     },
 

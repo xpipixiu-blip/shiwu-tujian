@@ -44,8 +44,8 @@ async function generateCardContent(
   const userPrompt = plain ? `请为以下物体撰写普通介绍。
 物体：${objectName}
 分类：${category}
-返回 JSON：{ "fantasyName": "${objectName}", "description": "1-2句普通介绍（≤60字）", "stats": [ { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 50 }, { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 70 }, { "type": "text", "label": "属性（≤4字）", "value": "值（≤6字）" } ], "funFact": "1句真实小知识（≤40字）" }
-规则 - fantasyName：使用真实物品名称 - description：客观自然清楚 - stats：恰好3条 - funFact：真实冷知识 - 只输出 JSON`
+返回 JSON：{ "fantasyName": "${objectName}", "description": "1-2句普通介绍（≤60字）", "stats": [ { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 50 }, { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 70 }, { "type": "text", "label": "属性（≤4字）", "value": "值（≤6字）" } ], "funFact": "1句真实小知识（≤40字）", "facts": [ { "label": "事实标签（≤6字）", "value": "事实内容（≤10字）" }, { "label": "事实标签（≤6字）", "value": "事实内容（≤10字）" }, { "label": "事实标签（≤6字）", "value": "事实内容（≤10字）" } ] }
+规则 - fantasyName：使用真实物品名称 - description：客观自然清楚 - stats：恰好3条 - funFact：真实冷知识 - facts：2-3条该物品的客观事实维度（如产地/季节/营养/用途/材质等），不要放分类/原型/风格 - 只输出 JSON`
     : `请为以下物体撰写图鉴卡片。
 
 设定氛围
@@ -53,13 +53,14 @@ async function generateCardContent(
 ${sp.moodKeywords.length ? `- 吸收这些气质：${sp.moodKeywords.join("、")}` : ""}
 - 物体：${objectName} / 分类：${category}
 
-返回 JSON：{ "fantasyName": "幻想名（4-8字优先，最多12字）", "description": "1-2句（≤60字）", "stats": [ { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 50 }, { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 70 }, { "type": "text", "label": "属性（≤4字）", "value": "值（≤6字）" } ], "funFact": "1句（≤40字）" }
+返回 JSON：{ "fantasyName": "幻想名（4-8字优先，最多12字）", "description": "1-2句（≤60字）", "stats": [ { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 50 }, { "type": "numeric", "label": "属性（≤4字）", "value": "单位（≤4字）", "score": 70 }, { "type": "text", "label": "属性（≤4字）", "value": "值（≤6字）" } ], "funFact": "1句（≤40字）", "facts": [ { "label": "事实标签（≤6字）", "value": "事实内容（≤10字）" }, { "label": "事实标签（≤6字）", "value": "事实内容（≤10字）" }, { "label": "事实标签（≤6字）", "value": "事实内容（≤10字）" } ] }
 
 写作要求
 - fantasyName：有创意，4-8字优先。${sp.avoidNames.length ? `严禁包含：${sp.avoidNames.join("、")}` : "严禁包含风格来源名或地标名"}
 - description：围绕物体本身的幻想特质，禁止出现任何地名或专有名词，≤60字
 - stats：恰好3条，2条numeric + 1条text。label ≤4字，要贴合设定氛围和物体类别
 - funFact：≤40字，是唯一可以融入设定氛围的地方，但不要堆专有名词。写成轻松有趣的一句
+- facts：2-3条该物品的客观事实维度（如产地/季节/风味/营养/材质/用途/硬度和质地/栖息地/习性等），要根据分类选择合适维度，不要放分类/原型/风格这类系统信息。风格化模式下facts仍然是真实事实，不要胡编离谱数字
 
 自检（不要输出自检过程，只在心里做）：
 1. 把设定名词从结果中全部去掉，文案是否还成立？成立→氛围太弱
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
   try {
     const analysis = await analyzeObject(image, effectiveModelId, byok);
     const content = await generateCardContent(sp, analysis.objectName, analysis.category, effectiveModelId, plain, byok);
-    const card: AtlasCard = { id: uid(), city: cityProfile.name, originalObjectName: analysis.objectName, category: analysis.category, fantasyName: content.fantasyName, description: content.description, stats: content.stats, funFact: content.funFact, imageUrl: image, createdAt: new Date().toISOString() };
+    const card: AtlasCard = { id: uid(), city: cityProfile.name, originalObjectName: analysis.objectName, category: analysis.category, fantasyName: content.fantasyName, description: content.description, stats: content.stats, funFact: content.funFact, facts: content.facts, imageUrl: image, createdAt: new Date().toISOString() };
     return NextResponse.json({ card });
   } catch (e) {
     if (e instanceof ApiError) return NextResponse.json({ error: e.message, details: e.details }, { status: e.status });
