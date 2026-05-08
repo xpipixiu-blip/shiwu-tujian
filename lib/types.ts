@@ -11,13 +11,21 @@ export type TextStat = {
   value: string;
 };
 
-export type CardPreset = "game" | "antique" | "liquid-metal" | "encyclopedia";
+export type CardPreset = "game" | "antique" | "liquid-metal" | "encyclopedia" | "farm-template" | "museum-card" | "rainbow-card" | "sleek-card" | "farm-template-cutout" | "sleek-template-cutout" | "rainbow-template-cutout" | "museum-template-cutout";
 
 export const CARD_PRESETS: { id: CardPreset; label: string }[] = [
   { id: "antique", label: "古董图鉴风" },
   { id: "game", label: "游戏风" },
   { id: "liquid-metal", label: "液态金属风" },
   { id: "encyclopedia", label: "自然百科风" },
+  { id: "farm-template", label: "像素农场" },
+  { id: "museum-card", label: "古物馆藏" },
+  { id: "rainbow-card", label: "彩虹稀有" },
+  { id: "sleek-card", label: "拉丝金属" },
+  { id: "farm-template-cutout", label: "像素农场 · 透卡" },
+  { id: "sleek-template-cutout", label: "拉丝金属 · 透卡" },
+  { id: "rainbow-template-cutout", label: "彩虹稀有 · 透卡" },
+  { id: "museum-template-cutout", label: "古物馆藏 · 透卡" },
 ];
 
 export type AtlasCard = {
@@ -29,10 +37,17 @@ export type AtlasCard = {
   description: string;
   stats: Array<NumericStat | TextStat>;
   funFact: string;
+  facts?: Array<{ label: string; value: string }>;
   imageUrl: string;
   croppedImageUrl?: string;
   cardPreset?: CardPreset;
   createdAt: string;
+  /** AI subject detection bbox (0-1000 normalized) */
+  subjectBoxData?: { centerX: number; centerY: number; width: number; height: number };
+  /** Resized original image base64 for template-aware recropping */
+  detectionBase64?: string;
+  /** Template-aware portrait crop (ratio-matched to template slot) */
+  templatePortraitUrl?: string;
 };
 
 export type CategoryId =

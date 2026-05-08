@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { toBlob, toPng } from "html-to-image";
 import type { AtlasCard as AtlasCardType, NumericStat, TextStat, CardPreset } from "@/lib/types";
 import { getCategoryEmoji, EmojiSpan } from "@/lib/emoji-icons";
+import FarmTemplateCardView from "@/components/cardTemplates/FarmTemplateCardView";
 
 type Props = { card: AtlasCardType; onEdit: () => void; onClose?: () => void };
 
@@ -21,7 +22,7 @@ type Theme = {
   cardBorder: string; cardOutline: string; cardOutlineOffset: number; cardShadow: string;
 };
 
-const THEMES: Record<CardPreset, Theme> = {
+const THEMES: Record<Exclude<CardPreset, "farm-template" | "museum-card" | "rainbow-card" | "sleek-card" | "farm-template-cutout" | "museum-template-cutout" | "rainbow-template-cutout" | "sleek-template-cutout">, Theme> = {
   antique: {
     bg: "#17130f", bgHex: "#17130f",
     nameColor: "#c7aa67", nameFont: "var(--font-display), serif", nameWeight: 700,
@@ -110,6 +111,12 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
   useEffect(() => { setIsMobile("ontouchstart" in window || navigator.maxTouchPoints > 0); }, []);
 
   const preset = card.cardPreset ?? "antique";
+
+  // Template card presets delegate to FarmTemplateCardView
+  if (preset === "farm-template" || preset === "museum-card" || preset === "rainbow-card" || preset === "sleek-card" || preset === "farm-template-cutout" || preset === "museum-template-cutout" || preset === "rainbow-template-cutout" || preset === "sleek-template-cutout") {
+    return <FarmTemplateCardView card={card} onEdit={onEdit} onClose={onClose} />;
+  }
+
   const t = THEMES[preset];
   const showEmoji = preset === "game" || preset === "encyclopedia";
   const isLiquid = preset === "liquid-metal";

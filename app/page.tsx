@@ -15,8 +15,9 @@ import type { AtlasCard, CardPreset } from "@/lib/types";
 import { loadCards, saveCard, deleteCard } from "@/lib/storage";
 import { loadModelId } from "@/lib/model-storage";
 import { resizeImageForUpload } from "@/lib/image-utils";
-import { calculateCrop, cropImage } from "@/lib/crop-utils";
+import { calculateCrop, cropImage, calculateTemplatePortraitCrop, cropImageToRect, getPortraitSlotRatio } from "@/lib/crop-utils";
 import type { SubjectBox, CropBox } from "@/lib/crop-utils";
+import { getTemplateConfig } from "@/lib/templateConfigs";
 import { loadByokConfig, saveByokConfig, clearByokConfig } from "@/lib/byok-storage";
 import type { ByokConfig } from "@/lib/byok-storage";
 import { loadPreset, savePreset } from "@/lib/preset-storage";
@@ -25,6 +26,7 @@ type Detection = {
   subjectBox: SubjectBox;
   cropBox: CropBox;
   croppedImageUrl: string;
+  originalBase64: string;
 };
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -100,7 +102,7 @@ export default function HomePage() {
       const img = await loadImage(base64);
       const crop = calculateCrop(img.width, img.height, box);
       const cropped = await cropImage(base64, crop);
-      setDetection({ subjectBox: box, cropBox: crop, croppedImageUrl: cropped });
+      setDetection({ subjectBox: box, cropBox: crop, croppedImageUrl: cropped, originalBase64: base64 });
     } catch (e) {
       setGenerateError((e as Error).message);
       resetDetection();
@@ -124,6 +126,8 @@ export default function HomePage() {
       const card = data.card as AtlasCard;
       card.cardPreset = cardPreset;
       if (detection?.croppedImageUrl) card.croppedImageUrl = detection.croppedImageUrl;
+      if (detection?.subjectBox) card.subjectBoxData = detection.subjectBox;
+      if (detection?.originalBase64) card.detectionBase64 = detection.originalBase64;
       setCurrentCard(card);
     } catch (e) {
       setGenerateError((e as Error).message);
@@ -161,6 +165,7 @@ export default function HomePage() {
         description: data.description ?? currentCard.description,
         stats: data.stats ?? currentCard.stats,
         funFact: data.funFact ?? currentCard.funFact,
+        facts: data.facts ?? currentCard.facts,
         createdAt: new Date().toISOString(),
       });
     } catch (e) {
@@ -173,13 +178,44 @@ export default function HomePage() {
   }, []);
   const handleClearByok = useCallback(() => { setByokConfig(null); clearByokConfig(); }, []);
 
-  const handlePresetChange = useCallback((p: CardPreset) => {
+  const handlePresetChange = useCallback(async (p: CardPreset) => {
     setCardPreset(p);
     savePreset(p);
-    // If card already exists, switch its preset without re-generating
-    if (currentCard) {
-      setCurrentCard({ ...currentCard, cardPreset: p });
+    if (!currentCard) return;
+
+    // Try to generate template-aware portrait crop
+    const config = getTemplateConfig(p);
+    const base64 = currentCard.detectionBase64;
+    const bbox = currentCard.subjectBoxData;
+
+    if (config && base64 && bbox) {
+      try {
+        // Get target ratio from portraitUnderlay (cutout) or portrait slot (background)
+        const uly = config.portraitUnderlay ?? config.slots.portrait;
+        const ulyInset = config.portraitUnderlay?.inset ?? { top: 0, right: 0, bottom: 0, left: 0 };
+        const effectiveW = uly.w - ulyInset.left - ulyInset.right;
+        const effectiveH = uly.h - ulyInset.top - ulyInset.bottom;
+        const targetRatio = effectiveW / effectiveH;
+
+        // Generate template-aware crop
+        const img = await loadImage(base64);
+        const crop = calculateTemplatePortraitCrop(img.width, img.height, bbox, targetRatio);
+        const templateUrl = await cropImageToRect(base64, crop);
+
+        setCurrentCard({
+          ...currentCard,
+          cardPreset: p,
+          templatePortraitUrl: templateUrl,
+        });
+        return;
+      } catch (e) {
+        console.warn("[Template Crop] failed to generate template-aware crop:", e);
+        // Fall through to set preset only
+      }
     }
+
+    // No detection data or not a template config — just switch preset
+    setCurrentCard({ ...currentCard, cardPreset: p });
   }, [currentCard]);
 
   const handleHistorySelect = useCallback((card: AtlasCard) => {
