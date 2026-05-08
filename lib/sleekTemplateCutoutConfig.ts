@@ -83,7 +83,7 @@ export const sleekTemplateCutoutConfig: TemplateConfig = {
       }
     },
     "badge": {
-      "x": 2160,
+      "x": 2179,
       "y": 320,
       "w": 440,
       "h": 440

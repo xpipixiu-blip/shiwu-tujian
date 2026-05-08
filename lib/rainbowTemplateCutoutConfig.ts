@@ -83,8 +83,8 @@ export const rainbowTemplateCutoutConfig: TemplateConfig = {
       }
     },
     "badge": {
-      "x": 2310,
-      "y": 320,
+      "x": 2291,
+      "y": 268,
       "w": 480,
       "h": 480
     },

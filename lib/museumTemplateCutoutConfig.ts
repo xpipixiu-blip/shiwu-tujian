@@ -83,8 +83,8 @@ export const museumTemplateCutoutConfig: TemplateConfig = {
       }
     },
     "badge": {
-      "x": 2150,
-      "y": 320,
+      "x": 2118,
+      "y": 301,
       "w": 480,
       "h": 480
     },
