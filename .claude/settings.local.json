@@ -19,7 +19,8 @@
       "Bash(taskkill //PID 59364 //F)",
       "Bash(git push *)",
       "Bash(gh pr *)",
-      "Bash(ipconfig)"
+      "Bash(ipconfig)",
+      "Bash(git *)"
     ]
   }
 }
