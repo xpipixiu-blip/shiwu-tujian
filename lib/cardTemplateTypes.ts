@@ -1,3 +1,9 @@
+export type SlotId =
+  | "name" | "badge" | "portrait" | "portraitInset"
+  | "portraitUnderlay"
+  | "info1" | "info2" | "bio"
+  | `footerCircle_${number}`;
+
 export type TemplateSlot = {
   x: number;
   y: number;

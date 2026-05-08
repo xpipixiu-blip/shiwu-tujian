@@ -10,7 +10,9 @@ import type {
   DebugMode,
   TemplateStatItem,
   PortraitUnderlayConfig,
+  SlotId,
 } from "@/lib/cardTemplateTypes";
+import SlotEditor from "@/components/cardTemplates/SlotEditor";
 
 /* ─── Coordinate helpers ──────────────────────────────── */
 
@@ -397,10 +399,17 @@ type Props = {
   model: TemplateRenderModel;
   config: TemplateConfig;
   debugMode?: DebugMode;
+  interactive?: boolean;
+  interactiveConfig?: TemplateConfig;
+  selectedSlot?: SlotId | null;
+  onSelectSlot?: (id: SlotId | null) => void;
+  onUpdateConfig?: (updater: (prev: TemplateConfig) => TemplateConfig) => void;
+  cardElRef?: React.RefObject<HTMLDivElement | null>;
+  hideOverlay?: boolean;
 };
 
 const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
-  ({ model, config, debugMode }, ref) => {
+  ({ model, config, debugMode, interactive, interactiveConfig, selectedSlot, onSelectSlot, onUpdateConfig, cardElRef, hideOverlay }, ref) => {
     const { designWidth: dw, designHeight: dh, slots, typography: t } = config;
     const hideContent = debugMode === "slots-only";
     const mountTime = React.useRef(0);
@@ -746,7 +755,18 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
           ))}
 
         {/* ── Debug overlay ───────────────────────────── */}
-        {debugMode && <DebugOverlay config={config} mode={debugMode} />}
+        {!interactive && debugMode && <DebugOverlay config={config} mode={debugMode} />}
+
+        {/* ── Interactive slot editor ──────────────────── */}
+        {interactive && !hideOverlay && interactiveConfig && onSelectSlot && onUpdateConfig && (
+          <SlotEditor
+            config={interactiveConfig}
+            selectedSlot={selectedSlot ?? null}
+            onSelectSlot={onSelectSlot}
+            onUpdateConfig={onUpdateConfig}
+            cardElRef={cardElRef ?? { current: null }}
+          />
+        )}
       </div>
     );
   },
