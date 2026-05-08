@@ -40,7 +40,7 @@ export const museumTemplateCutoutConfig: TemplateConfig = {
 
   slots: {
     name: { x: 380, y: 410, w: 1520, h: 320, padding: { top: 0, right: 40, bottom: 0, left: 40 } },
-    badge: { x: 2160, y: 320, w: 440, h: 440 },
+    badge: { x: 2160, y: 320, w: 480, h: 480 },
     portrait: { x: 220, y: 942, w: 2775, h: 2345 },
     portraitInset: { top: 44, right: 44, bottom: 44, left: 44 },
     info1: { x: 280, y: 2340, w: 2400, h: 250, padding: { top: 0, right: 36, bottom: 0, left: 36 } },
