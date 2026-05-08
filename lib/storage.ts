@@ -29,6 +29,8 @@ export function saveCard(card: AtlasCard): void {
     ...c,
     imageUrl: "",
     croppedImageUrl: "",
+    detectionBase64: "",
+    templatePortraitUrl: "",
   }));
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
@@ -38,6 +40,8 @@ export function saveCard(card: AtlasCard): void {
       ...c,
       imageUrl: "",
       croppedImageUrl: "",
+      detectionBase64: "",
+      templatePortraitUrl: "",
     }));
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));

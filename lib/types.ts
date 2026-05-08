@@ -42,6 +42,12 @@ export type AtlasCard = {
   croppedImageUrl?: string;
   cardPreset?: CardPreset;
   createdAt: string;
+  /** AI subject detection bbox (0-1000 normalized) */
+  subjectBoxData?: { centerX: number; centerY: number; width: number; height: number };
+  /** Resized original image base64 for template-aware recropping */
+  detectionBase64?: string;
+  /** Template-aware portrait crop (ratio-matched to template slot) */
+  templatePortraitUrl?: string;
 };
 
 export type CategoryId =

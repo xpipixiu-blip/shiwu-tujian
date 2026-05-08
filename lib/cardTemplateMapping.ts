@@ -212,7 +212,7 @@ export function mapAtlasCardToTemplateModel(
     nameText: clampName(card.fantasyName),
     badgeText: card.category,
     badgeIcon: catEmoji || undefined,
-    portraitImageUrl: card.croppedImageUrl || card.imageUrl || "",
+    portraitImageUrl: card.templatePortraitUrl || card.croppedImageUrl || card.imageUrl || "",
     infoLine1: clampInfoLine1(facts),
     statItems: clampStatItems(statItems),
     bioText: clampBio(`${card.description}\n小知识：${cleanFunFact}`),
