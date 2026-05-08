@@ -261,95 +261,27 @@ function FarmTemplateCardViewInner({ card, onEdit, onClose }: Props) {
     await new Promise<void>((resolve) => { requestAnimationFrame(() => { requestAnimationFrame(() => resolve()); }); });
 
     // ═══ Export params ═══
-    const exportWidth = mobile ? 1200 : 1500;
-    const pixelRatios = mobile ? [1, 1.5] : [2, 1];
+    const targetExportWidth = mobile ? 1200 : 1500;
+    const displayWidth = targetNode.offsetWidth || 1;
+    // Calculate pixelRatio to hit target output size
+    const optimalPR = targetExportWidth / displayWidth;
 
-    debugLog("exportWidth:", exportWidth, "pixelRatios:", pixelRatios);
+    debugLog("targetExportWidth:", targetExportWidth, "displayWidth:", displayWidth, "optimalPR:", optimalPR);
 
-    // ═══ EXPORT: try visible node first, then clone ═══
-    for (const pixelRatio of pixelRatios) {
-      try {
-        debugLog(`attempt visible node capture, pixelRatio=${pixelRatio}`);
+    // ═══ EXPORT: try visible node with calculated pixelRatio ═══
+    try {
+      debugLog(`attempt visible node capture, pixelRatio=${optimalPR}`);
 
-        const { toBlob } = await import("html-to-image");
-        const blob = await toBlob(targetNode, {
-          pixelRatio,
-          width: targetNode.offsetWidth,
-          height: targetNode.offsetHeight,
-        });
+      const { toBlob } = await import("html-to-image");
+      const blob = await toBlob(targetNode, {
+        pixelRatio: optimalPR,
+        width: targetNode.offsetWidth,
+        height: targetNode.offsetHeight,
+      });
 
-        debugLog("toBlob done, blob size:", blob?.size ?? 0);
+      debugLog("toBlob done, blob size:", blob?.size ?? 0);
 
-        if (!blob) throw new Error("生成图片失败");
-        if (blob.size < 20000) {
-          debugLog("WARNING: blob size < 20KB, possible blank image, trying clone...");
-          // Fall through to clone attempt
-        } else {
-          // Success — direct download
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.download = filename;
-          link.href = url;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          setTimeout(() => URL.revokeObjectURL(url), 10000);
-
-          debugLog("download triggered via visible node");
-          debugLog("export complete in", (performance.now() - t0).toFixed(0) + "ms");
-          setIsSaving(false);
-          return;
-        }
-      } catch (e) {
-        debugLog("visible node capture failed:", e);
-        // Continue to clone attempt
-      }
-    }
-
-    // ═══ FALLBACK: try offscreen clone ═══
-    debugLog("trying offscreen clone...");
-    for (const pixelRatio of pixelRatios) {
-      try {
-        debugLog(`clone attempt pixelRatio=${pixelRatio}`);
-
-        const clone = targetNode.cloneNode(true) as HTMLElement;
-        clone.style.position = "fixed";
-        clone.style.left = "-9999px";
-        clone.style.top = "0";
-        clone.style.width = `${exportWidth}px`;
-        clone.style.opacity = "1";
-        clone.style.visibility = "visible";
-        clone.style.pointerEvents = "none";
-        clone.style.overflow = "hidden";
-        clone.style.zIndex = "-1";
-        document.body.appendChild(clone);
-
-        // Double rAF for clone layout
-        await new Promise<void>((resolve) => { requestAnimationFrame(() => { requestAnimationFrame(() => resolve()); }); });
-
-        // Wait for clone images
-        const cloneImgs = clone.querySelectorAll("img").length;
-        debugLog(`clone img count: ${cloneImgs}`);
-
-        const { allReady: cloneReady, details: cloneDetails } = await waitForImages(clone);
-        debugLog("clone image results:", cloneDetails);
-
-        if (!cloneReady) {
-          document.body.removeChild(clone);
-          throw new Error("clone images not ready");
-        }
-
-        const { toBlob } = await import("html-to-image");
-        const blob = await toBlob(clone, { pixelRatio });
-
-        document.body.removeChild(clone);
-        debugLog("clone toBlob done, blob size:", blob?.size ?? 0);
-
-        if (!blob) throw new Error("生成图片失败");
-        if (blob.size < 20000) {
-          throw new Error("导出失败，图片内容为空，请重试");
-        }
-
+      if (blob && blob.size >= 20000) {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.download = filename;
@@ -359,15 +291,70 @@ function FarmTemplateCardViewInner({ card, onEdit, onClose }: Props) {
         document.body.removeChild(link);
         setTimeout(() => URL.revokeObjectURL(url), 10000);
 
-        debugLog("download triggered via clone");
+        debugLog("download triggered via visible node");
         debugLog("export complete in", (performance.now() - t0).toFixed(0) + "ms");
         setIsSaving(false);
         return;
-      } catch (e) {
-        debugLog("clone attempt failed:", e);
-        const lingering = document.querySelector('[style*="left: -9999px"]');
-        if (lingering) lingering.remove();
       }
+
+      debugLog("visible node gave small/empty blob, trying clone...");
+    } catch (e) {
+      debugLog("visible node capture failed:", e);
+    }
+
+    // ═══ FALLBACK: offscreen clone at fixed target size (pixelRatio=1) ═══
+    debugLog("trying offscreen clone...");
+    try {
+      const clone = targetNode.cloneNode(true) as HTMLElement;
+      clone.style.position = "fixed";
+      clone.style.left = "-9999px";
+      clone.style.top = "0";
+      clone.style.width = `${targetExportWidth}px`;
+      clone.style.opacity = "1";
+      clone.style.visibility = "visible";
+      clone.style.pointerEvents = "none";
+      clone.style.overflow = "hidden";
+      clone.style.zIndex = "-1";
+      document.body.appendChild(clone);
+
+      await new Promise<void>((resolve) => { requestAnimationFrame(() => { requestAnimationFrame(() => resolve()); }); });
+
+      const cloneImgs = clone.querySelectorAll("img").length;
+      debugLog(`clone img count: ${cloneImgs}`);
+
+      const { allReady: cloneReady, details: cloneDetails } = await waitForImages(clone);
+      debugLog("clone image results:", cloneDetails);
+
+      if (!cloneReady) {
+        document.body.removeChild(clone);
+        throw new Error("clone images not ready");
+      }
+
+      const { toBlob } = await import("html-to-image");
+      const blob = await toBlob(clone, { pixelRatio: 1 });
+
+      document.body.removeChild(clone);
+      debugLog("clone toBlob done, blob size:", blob?.size ?? 0);
+
+      if (!blob || blob.size < 20000) throw new Error("导出失败，图片内容为空，请重试");
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.download = filename;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+      debugLog("download triggered via clone");
+      debugLog("export complete in", (performance.now() - t0).toFixed(0) + "ms");
+      setIsSaving(false);
+      return;
+    } catch (e) {
+      debugLog("clone attempt failed:", e);
+      const lingering = document.querySelector('[style*="left: -9999px"]');
+      if (lingering) lingering.remove();
     }
 
     // ═══ LAST RESORT: open in new tab ═══
