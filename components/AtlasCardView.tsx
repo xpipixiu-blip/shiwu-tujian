@@ -22,7 +22,7 @@ type Theme = {
   cardBorder: string; cardOutline: string; cardOutlineOffset: number; cardShadow: string;
 };
 
-const THEMES: Record<Exclude<CardPreset, "farm-template" | "museum-card" | "rainbow-card" | "sleek-card">, Theme> = {
+const THEMES: Record<Exclude<CardPreset, "farm-template" | "museum-card" | "rainbow-card" | "sleek-card" | "farm-template-cutout" | "museum-template-cutout" | "rainbow-template-cutout" | "sleek-template-cutout">, Theme> = {
   antique: {
     bg: "#17130f", bgHex: "#17130f",
     nameColor: "#c7aa67", nameFont: "var(--font-display), serif", nameWeight: 700,
@@ -113,7 +113,7 @@ export default function AtlasCardView({ card, onEdit, onClose }: Props) {
   const preset = card.cardPreset ?? "antique";
 
   // Template card presets delegate to FarmTemplateCardView
-  if (preset === "farm-template" || preset === "museum-card" || preset === "rainbow-card" || preset === "sleek-card") {
+  if (preset === "farm-template" || preset === "museum-card" || preset === "rainbow-card" || preset === "sleek-card" || preset === "farm-template-cutout" || preset === "museum-template-cutout" || preset === "rainbow-template-cutout" || preset === "sleek-template-cutout") {
     return <FarmTemplateCardView card={card} onEdit={onEdit} onClose={onClose} />;
   }
 

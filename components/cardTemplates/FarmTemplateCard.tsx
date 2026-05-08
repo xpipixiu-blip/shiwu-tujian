@@ -9,6 +9,7 @@ import type {
   SlotInset,
   DebugMode,
   TemplateStatItem,
+  PortraitUnderlayConfig,
 } from "@/lib/cardTemplateTypes";
 
 /* ─── Coordinate helpers ──────────────────────────────── */
@@ -105,6 +106,7 @@ function DebugOverlay({
   mode: DebugMode;
 }) {
   const { designWidth: dw, designHeight: dh, slots } = config;
+  const isCutout = config.templateMode === "cutoutOverlay";
 
   const labelStyle = (color: string): React.CSSProperties => ({
     fontSize: fs(34, dw),
@@ -186,6 +188,16 @@ function DebugOverlay({
               portrait_image_clip
             </span>
           </div>
+        );
+      })()}
+
+      {/* cutout underlay debug */}
+      {isCutout && showAll && (() => {
+        const uly = config.portraitUnderlay ?? slots.portrait;
+        return dimBox(
+          { x: uly.x, y: uly.y, w: uly.w, h: uly.h },
+          "portrait_underlay",
+          "rgba(255,200,60,1)",
         );
       })()}
 
@@ -404,6 +416,17 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
     }
 
     const bgSrc = config.backgroundImagePreview || config.backgroundImage;
+    const isCutout = config.templateMode === "cutoutOverlay";
+    const overlaySrc = config.overlayImage ?? "";
+
+    // Underlay position: use portraitUnderlay config, fall back to portrait slot
+    const underlayCfg: PortraitUnderlayConfig = config.portraitUnderlay ?? {
+      x: slots.portrait.x,
+      y: slots.portrait.y,
+      w: slots.portrait.w,
+      h: slots.portrait.h,
+    };
+    const underlayInset = underlayCfg.inset ?? { top: 0, right: 0, bottom: 0, left: 0 };
 
     return (
       <div
@@ -416,47 +439,97 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
           overflow: "hidden",
         }}
       >
-        {/* ── Layer 0: Background ─────────────────────── */}
-        <img
-          data-template-bg="true"
-          src={bgSrc}
-          alt=""
-          crossOrigin="anonymous"
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "fill",
-          }}
-          draggable={false}
-          onLoad={() => {
-            if (process.env.NODE_ENV === "development") {
-              console.log("[Template Perf] background image loaded");
-            }
-          }}
-          onError={(e) => {
-            const el = e.currentTarget;
-            el.style.display = "none";
-            const parent = el.parentElement;
-            if (parent && !parent.querySelector(".template-missing-notice")) {
-              const notice = document.createElement("div");
-              notice.className = "template-missing-notice";
-              notice.style.cssText =
-                "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#2a2018;color:#c8b88a;font-family:var(--font-display);font-size:14px;text-align:center;padding:20px;z-index:200;";
-              notice.textContent =
-                "请将模板图片放到 public/templates/farm-card-v1.png";
-              parent.appendChild(notice);
-            }
-          }}
-        />
+        {/* ── CUTOUT MODE: Layer 0 — Portrait underlay ── */}
+        {isCutout && (
+          <div
+            data-portrait-underlay="true"
+            style={{
+              position: "absolute",
+              left: px(underlayCfg.x + underlayInset.left, dw),
+              top: py(underlayCfg.y + underlayInset.top, dh),
+              width: pw(underlayCfg.w - underlayInset.left - underlayInset.right, dw),
+              height: ph(underlayCfg.h - underlayInset.top - underlayInset.bottom, dh),
+              overflow: "hidden",
+              zIndex: 0,
+            }}
+          >
+            {model.portraitImageUrl ? (
+              <img
+                data-portrait-underlay-img="true"
+                src={model.portraitImageUrl}
+                alt=""
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  objectPosition: "center",
+                  display: "block",
+                }}
+                draggable={false}
+              />
+            ) : null}
+          </div>
+        )}
 
-        {/* ── Layer 1: Portrait ───────────────────────── */}
-        {!hideContent && (
+        {/* ── Layer 1: Template overlay (cutout) or Background (old) */}
+        {isCutout ? (
+          <img
+            data-template-overlay="true"
+            src={overlaySrc}
+            alt=""
+            crossOrigin="anonymous"
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "fill",
+              zIndex: 1,
+              pointerEvents: "none",
+            }}
+            draggable={false}
+          />
+        ) : (
+          /* ── Layer 0: Background (old mode) ──────── */
+          <img
+            data-template-bg="true"
+            src={bgSrc}
+            alt=""
+            crossOrigin="anonymous"
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "fill",
+            }}
+            draggable={false}
+            onLoad={() => {
+              if (process.env.NODE_ENV === "development") {
+                console.log("[Template Perf] background image loaded");
+              }
+            }}
+            onError={(e) => {
+              const el = e.currentTarget;
+              el.style.display = "none";
+              const parent = el.parentElement;
+              if (parent && !parent.querySelector(".template-missing-notice")) {
+                const notice = document.createElement("div");
+                notice.className = "template-missing-notice";
+                notice.style.cssText =
+                  "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#2a2018;color:#c8b88a;font-family:var(--font-display);font-size:14px;text-align:center;padding:20px;z-index:200;";
+                notice.textContent =
+                  "请将模板图片放到 public/templates/farm-card-v1.png";
+                parent.appendChild(notice);
+              }
+            }}
+          />
+        )}
+
+        {/* ── Layer 1b: Portrait (old mode only; cutout uses underlay) ── */}
+        {!isCutout && !hideContent && (
           <>
-            {/* Outer portrait slot (invisible, just structural) */}
             <div style={rectStyle(slots.portrait, dw, dh)}>
-              {/* Inner clip container */}
               <div
                 style={{
                   position: "absolute",
@@ -493,6 +566,7 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
           <div
             style={{
               ...rectStyle(slots.name, dw, dh),
+              zIndex: 2,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -526,6 +600,7 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
           <div
             style={{
               ...rectStyle(slots.badge, dw, dh),
+              zIndex: 2,
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
@@ -564,6 +639,7 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
           <div
             style={{
               ...rectStyle(slots.info1, dw, dh),
+              zIndex: 2,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -595,6 +671,7 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
           <div
             style={{
               ...rectStyle(slots.info2, dw, dh),
+              zIndex: 2,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-evenly",
@@ -615,6 +692,7 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
           <div
             style={{
               ...rectStyle(slots.bio, dw, dh),
+              zIndex: 2,
               overflow: "hidden",
               paddingLeft: pw(slots.bio.padding.left, dw),
               paddingRight: pw(slots.bio.padding.right, dw),
@@ -649,6 +727,7 @@ const FarmTemplateCard = forwardRef<HTMLDivElement, Props>(
               key={i}
               style={{
                 ...circleBoundsStyle(circle, dw, dh),
+                zIndex: 2,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",

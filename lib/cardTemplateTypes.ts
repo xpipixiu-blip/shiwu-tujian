@@ -45,6 +45,17 @@ export type TemplateRenderModel = {
 
 export type DebugMode = "full" | "slots-only";
 
+export type TemplateMode = "background" | "cutoutOverlay";
+
+export type PortraitUnderlayConfig = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Optional inset to shrink the underlay relative to its slot */
+  inset?: SlotInset;
+};
+
 export type TemplateConfig = {
   id: string;
   label: string;
@@ -53,6 +64,11 @@ export type TemplateConfig = {
   backgroundImage: string;
   backgroundImagePreview?: string;
   backgroundImageExport?: string;
+
+  /** "background" = old template as CSS bg; "cutoutOverlay" = transparent overlay on top of user image */
+  templateMode?: TemplateMode;
+  /** Path to the transparent cutout overlay image (only used in cutoutOverlay mode) */
+  overlayImage?: string;
 
   typography: {
     name: SlotTypography;
@@ -83,4 +99,8 @@ export type TemplateConfig = {
     bio: TemplateSlot & { padding: SlotInset };
     footerCircles: TemplateCircleSlot[];
   };
+
+  /** Position of the user-image underlay in cutoutOverlay mode.
+   *  Defaults to slots.portrait if not specified. */
+  portraitUnderlay?: PortraitUnderlayConfig;
 };

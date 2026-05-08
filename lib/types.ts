@@ -11,7 +11,7 @@ export type TextStat = {
   value: string;
 };
 
-export type CardPreset = "game" | "antique" | "liquid-metal" | "encyclopedia" | "farm-template" | "museum-card" | "rainbow-card" | "sleek-card";
+export type CardPreset = "game" | "antique" | "liquid-metal" | "encyclopedia" | "farm-template" | "museum-card" | "rainbow-card" | "sleek-card" | "farm-template-cutout" | "sleek-template-cutout" | "rainbow-template-cutout" | "museum-template-cutout";
 
 export const CARD_PRESETS: { id: CardPreset; label: string }[] = [
   { id: "antique", label: "古董图鉴风" },
@@ -22,6 +22,10 @@ export const CARD_PRESETS: { id: CardPreset; label: string }[] = [
   { id: "museum-card", label: "古物馆藏" },
   { id: "rainbow-card", label: "彩虹稀有" },
   { id: "sleek-card", label: "拉丝金属" },
+  { id: "farm-template-cutout", label: "像素农场 · 透卡" },
+  { id: "sleek-template-cutout", label: "拉丝金属 · 透卡" },
+  { id: "rainbow-template-cutout", label: "彩虹稀有 · 透卡" },
+  { id: "museum-template-cutout", label: "古物馆藏 · 透卡" },
 ];
 
 export type AtlasCard = {

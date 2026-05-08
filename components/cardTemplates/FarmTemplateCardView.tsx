@@ -11,6 +11,9 @@ const PERF = process.env.NODE_ENV === "development";
 function logPerf(label: string, start: number) {
   if (PERF) console.log(`[Template Perf] ${label}: ${(performance.now() - start).toFixed(1)}ms`);
 }
+function debugLog(...args: unknown[]) {
+  if (PERF) console.log("[Template Export]", ...args);
+}
 
 /* ─── Template image cache ─────────────────────────────── */
 
@@ -28,7 +31,6 @@ function preloadImage(url: string): Promise<void> {
     img.onload = () => { entry.loaded = true; resolve(); };
     img.onerror = () => { entry.loaded = true; resolve(); };
     img.src = url;
-    // Try to decode immediately if supported
     if (img.decode) {
       img.decode().then(() => { entry.loaded = true; resolve(); }).catch(() => {});
     }
@@ -39,6 +41,65 @@ function preloadImage(url: string): Promise<void> {
 
 function isImageCached(url: string): boolean {
   return imageCache.get(url)?.loaded === true;
+}
+
+/* ─── Image wait utility ──────────────────────────────── */
+
+type ImageLoadResult =
+  | { ok: true; naturalWidth: number; naturalHeight: number }
+  | { ok: false; reason: string };
+
+function waitForImage(img: HTMLImageElement): Promise<ImageLoadResult> {
+  return new Promise((resolve) => {
+    if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
+      resolve({ ok: true, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight });
+      return;
+    }
+    if (img.complete && img.naturalWidth === 0) {
+      resolve({ ok: false, reason: "image broken (naturalWidth=0)" });
+      return;
+    }
+    let settled = false;
+    const done = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (ok && img.naturalWidth > 0) {
+        resolve({ ok: true, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight });
+      } else {
+        resolve({ ok: false, reason: `load failed (naturalWidth=${img.naturalWidth})` });
+      }
+    };
+    img.onload = () => done(true);
+    img.onerror = () => done(false);
+    // Timeout after 15s
+    setTimeout(() => done(false), 15000);
+  });
+}
+
+async function waitForImages(node: HTMLElement): Promise<{ allReady: boolean; details: string[] }> {
+  const images = node.querySelectorAll<HTMLImageElement>("img");
+  const details: string[] = [];
+  let allReady = true;
+
+  for (const img of Array.from(images)) {
+    const src = img.src.slice(0, 80);
+    const result = await waitForImage(img);
+    if (result.ok) {
+      details.push(`OK  ${result.naturalWidth}x${result.naturalHeight} src=${src}`);
+    } else {
+      details.push(`FAIL ${result.reason} src=${src}`);
+      allReady = false;
+    }
+  }
+
+  return { allReady, details };
+}
+
+/* ─── Mobile detection ────────────────────────────────── */
+
+function getIsMobile(): boolean {
+  if (typeof window === "undefined") return false;
+  return "ontouchstart" in window || navigator.maxTouchPoints > 0;
 }
 
 /* ─── Component ───────────────────────────────────────── */
@@ -63,12 +124,14 @@ function FarmTemplateCardViewInner({ card, onEdit, onClose }: Props) {
   );
   const previewBg = config.backgroundImagePreview || config.backgroundImage;
   const exportBg = config.backgroundImageExport || config.backgroundImage;
+  const isCutout = config.templateMode === "cutoutOverlay";
+  const overlaySrc = config.overlayImage ?? "";
 
   useEffect(() => {
-    setIsMobile("ontouchstart" in window || navigator.maxTouchPoints > 0);
+    setIsMobile(getIsMobile());
   }, []);
 
-  // Preload both preview and export backgrounds
+  // Preload backgrounds
   useEffect(() => {
     const t0 = performance.now();
     const cached = isImageCached(previewBg);
@@ -76,21 +139,25 @@ function FarmTemplateCardViewInner({ card, onEdit, onClose }: Props) {
       if (!cached) logPerf("bg preview preloaded", t0);
       setBgReady(true);
     });
-    // Also warm export image in background
     if (exportBg !== previewBg && !isImageCached(exportBg)) {
       preloadImage(exportBg);
     }
-  }, [previewBg, exportBg]);
+    // Preload overlay image for cutout mode
+    if (isCutout && overlaySrc && !isImageCached(overlaySrc)) {
+      preloadImage(overlaySrc);
+    }
+  }, [previewBg, exportBg, isCutout, overlaySrc]);
 
   // Check template image exists
   useEffect(() => {
+    const src = isCutout && overlaySrc ? overlaySrc : previewBg;
     const img = new Image();
     img.onload = () => setImageMissing(false);
     img.onerror = () => setImageMissing(true);
-    img.src = previewBg;
-  }, [previewBg]);
+    img.src = src;
+  }, [previewBg, isCutout, overlaySrc]);
 
-  // Memoize model mapping — uses original croppedImageUrl directly
+  // Memoize model mapping
   const model = useMemo(() => {
     const t0 = performance.now();
     const m = mapAtlasCardToTemplateModel(card);
@@ -107,7 +174,7 @@ function FarmTemplateCardViewInner({ card, onEdit, onClose }: Props) {
   ]);
 
   const safeName = card.fantasyName.replace(/[\\/:*?"<>|]/g, "-").slice(0, 40);
-  const filename = `${safeName}-farm-card.png`;
+  const filename = `${safeName}-card.png`;
 
   const handleSave = useCallback(async () => {
     if (!cardRef.current) return;
@@ -116,81 +183,137 @@ function FarmTemplateCardViewInner({ card, onEdit, onClose }: Props) {
     setSaveError(null);
 
     const cardEl = cardRef.current;
+    const mobile = getIsMobile();
 
-    try {
-      // Use offscreen clone at export resolution — never touch visible card
-      const clone = cardEl.cloneNode(true) as HTMLElement;
-      clone.style.position = "fixed";
-      clone.style.left = "-10000px";
-      clone.style.top = "0";
-      clone.style.width = "1500px";
-      clone.style.pointerEvents = "none";
-      clone.style.zIndex = "-1";
-      document.body.appendChild(clone);
+    // ── Export params ──
+    const exportWidth = mobile ? 1200 : 1500;
+    const exportHeight = mobile ? 1600 : 2000;
+    const pixelRatios = mobile ? [1, 1.5] : [2, 1];
 
-      // Wait for images in clone to load
-      const images = clone.querySelectorAll<HTMLImageElement>("img");
-      await Promise.all(
-        Array.from(images).map(
-          (img) =>
-            new Promise<void>((resolve) => {
-              if (img.complete) { resolve(); return; }
-              img.onload = () => resolve();
-              img.onerror = () => resolve();
-            }),
-        ),
-      );
+    // ── Debug log ──
+    debugLog("=== export start ===");
+    debugLog("selectedTemplateId:", config.id);
+    debugLog("templateMode:", config.templateMode ?? "background");
+    debugLog("overlayImage:", overlaySrc || "(none)");
+    debugLog("portraitImage src type:", (() => {
+      const u = model.portraitImageUrl;
+      if (!u) return "none";
+      if (u.startsWith("blob:")) return "blob";
+      if (u.startsWith("data:")) return "data:image";
+      if (u.startsWith("http")) return "http";
+      return "public path";
+    })());
+    debugLog("isMobile:", mobile);
+    debugLog("exportWidth:", exportWidth, "exportHeight:", exportHeight);
+    debugLog("pixelRatios:", pixelRatios);
 
-      // Dynamic import html-to-image
-      const { toBlob } = await import("html-to-image");
+    // Try export with fallback pixelRatios
+    let lastError: unknown = null;
 
-      logPerf("export toBlob start", t0);
-      const blob = await toBlob(clone, { pixelRatio: 1 });
-      logPerf("export toBlob done", t0);
-
-      // Clean up clone
-      document.body.removeChild(clone);
-
-      if (!blob) throw new Error("生成图片失败");
-
-      // Always direct browser download — never share
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.download = filename;
-      link.href = url;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
-      logPerf("export complete", t0);
-      setIsSaving(false);
-    } catch (e) {
-      // Clean up clone if still present
-      const lingering = document.querySelector('[style*="left: -10000px"]');
-      if (lingering) lingering.remove();
-
-      console.error("[Template] export failed:", e);
+    for (const pixelRatio of pixelRatios) {
       try {
-        // Fallback: open image in new tab for manual save
-        const { toPng } = await import("html-to-image");
-        const dataUrl = await toPng(cardEl, { pixelRatio: 3 });
-        const w = window.open("");
-        if (w) {
-          w.document.write(
-            `<html><body style="margin:0;background:#0b0a08;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;"><img src="${dataUrl}" style="max-width:100%;max-height:90dvh;border-radius:4px;" /><p style="color:#8b8076;font-size:14px;font-family:sans-serif;margin-top:12px;">长按图片保存到相册</p></body></html>`,
-          );
-        } else {
-          setSaveError("弹出窗口被拦截，请允许弹窗后重试");
+        debugLog(`attempt pixelRatio=${pixelRatio}`);
+
+        // Clone DOM node offscreen
+        const clone = cardEl.cloneNode(true) as HTMLElement;
+        clone.style.position = "fixed";
+        clone.style.left = "-10000px";
+        clone.style.top = "0";
+        clone.style.width = `${exportWidth}px`;
+        clone.style.height = `${exportHeight}px`;
+        clone.style.opacity = "1";
+        clone.style.visibility = "visible";
+        clone.style.pointerEvents = "none";
+        clone.style.zIndex = "-1";
+        document.body.appendChild(clone);
+
+        // ── Wait for ALL images ──
+        const imgCount = clone.querySelectorAll("img").length;
+        debugLog(`images in export node: ${imgCount}`);
+
+        const { allReady, details } = await waitForImages(clone);
+        debugLog("image load results:", details);
+
+        if (!allReady) {
+          document.body.removeChild(clone);
+          // If overlay or portrait image failed, report clearly
+          const failDetail = details.find((d) => d.startsWith("FAIL"));
+          throw new Error(failDetail ? `图片尚未加载完成：${failDetail}` : "图片尚未加载完成，请稍后重试");
         }
-      } catch {
-        setSaveError("下载失败，请截图保存");
+
+        // ── Export ──
+        debugLog("html-to-image start");
+        const { toBlob } = await import("html-to-image");
+        const blob = await toBlob(clone, { pixelRatio });
+        debugLog("html-to-image done, blob size:", blob?.size ?? 0);
+        logPerf(`export toBlob (pixelRatio=${pixelRatio})`, t0);
+
+        // Clean up clone
+        document.body.removeChild(clone);
+
+        if (!blob) throw new Error("生成图片失败");
+
+        // ── White detection ──
+        if (blob.size < 20000) {
+          debugLog("WARNING: blob size < 20KB, possible blank image");
+          throw new Error("导出失败，图片内容为空，请重试");
+        }
+        debugLog("blob size OK:", blob.size);
+
+        // ── Direct download ──
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = filename;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+        debugLog("download triggered");
+        logPerf("export complete", t0);
+        setIsSaving(false);
+        return; // success
+      } catch (e) {
+        lastError = e;
+        debugLog("export attempt failed:", e);
+
+        // Clean up lingering clone
+        const lingering = document.querySelector('[style*="left: -10000px"]');
+        if (lingering) lingering.remove();
+
+        // If this was the last pixelRatio attempt, handle fallback
+        if (pixelRatio === pixelRatios[pixelRatios.length - 1]) {
+          console.error("[Template] export failed:", e);
+          const msg = e instanceof Error ? e.message : "导出失败";
+
+          // Try fallback: open image in new tab for manual save
+          try {
+            const { toPng } = await import("html-to-image");
+            const dataUrl = await toPng(cardEl, { pixelRatio: 2 });
+            const w = window.open("");
+            if (w) {
+              w.document.write(
+                `<html><body style="margin:0;background:#0b0a08;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;"><img src="${dataUrl}" style="max-width:100%;max-height:90dvh;border-radius:4px;" /><p style="color:#8b8076;font-size:14px;font-family:sans-serif;margin-top:12px;">长按图片保存到相册</p></body></html>`,
+              );
+              setSaveError(null);
+            } else {
+              setSaveError("弹出窗口被拦截，请允许弹窗后重试");
+            }
+          } catch {
+            setSaveError(msg || "下载失败，请截图保存");
+          }
+        }
+        // else: continue to next pixelRatio
       }
-      setIsSaving(false);
     }
-  }, [filename]);
+
+    setIsSaving(false);
+  }, [filename, config.id, config.templateMode, overlaySrc, model.portraitImageUrl]);
 
   // Template image missing
   if (imageMissing) {
+    const missingSrc = isCutout ? overlaySrc : previewBg;
     return (
       <div className="flex justify-center">
         <div
@@ -204,7 +327,7 @@ function FarmTemplateCardViewInner({ card, onEdit, onClose }: Props) {
             模板图片未找到
           </p>
           <p className="text-xs mt-2" style={{ color: "#8b8076" }}>
-            请检查 public/templates/farm-card-v1.png
+            请检查 {missingSrc}
           </p>
           {onClose && (
             <button
@@ -261,8 +384,6 @@ function FarmTemplateCardViewInner({ card, onEdit, onClose }: Props) {
                 <span className="inline-block w-3 h-3 border border-ink-600 border-t-gold-500 rounded-full animate-spin" />
                 处理中
               </span>
-            ) : isMobile ? (
-              "保存/分享"
             ) : (
               "下载 PNG"
             )}
