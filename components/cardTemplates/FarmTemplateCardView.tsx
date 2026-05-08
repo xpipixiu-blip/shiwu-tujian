@@ -115,45 +115,45 @@ function FarmTemplateCardViewInner({ card, onEdit, onClose }: Props) {
     setIsSaving(true);
     setSaveError(null);
 
-    // Dynamic import — html-to-image only loads when user clicks export
-    const { toBlob, toPng } = await import("html-to-image");
-
-    // Swap background to export-quality image if different
-    const bgImg = cardRef.current.querySelector<HTMLImageElement>("[data-template-bg]");
-    const origSrc = bgImg?.src ?? "";
-    let swapped = false;
-
-    if (bgImg && exportBg !== previewBg) {
-      // Preload export image if not cached
-      await preloadImage(exportBg);
-      bgImg.src = exportBg;
-      await new Promise<void>((resolve) => {
-        if (bgImg.complete) { resolve(); return; }
-        bgImg.onload = () => resolve();
-        bgImg.onerror = () => resolve();
-      });
-      swapped = true;
-    }
+    const cardEl = cardRef.current;
 
     try {
-      const cardEl = cardRef.current;
-      const displayWidth = cardEl.offsetWidth;
-      const targetWidth = 1500;
-      const pixelRatio = targetWidth / displayWidth;
+      // Use offscreen clone at export resolution — never touch visible card
+      const clone = cardEl.cloneNode(true) as HTMLElement;
+      clone.style.position = "fixed";
+      clone.style.left = "-10000px";
+      clone.style.top = "0";
+      clone.style.width = "1500px";
+      clone.style.pointerEvents = "none";
+      clone.style.zIndex = "-1";
+      document.body.appendChild(clone);
+
+      // Wait for images in clone to load
+      const images = clone.querySelectorAll<HTMLImageElement>("img");
+      await Promise.all(
+        Array.from(images).map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              if (img.complete) { resolve(); return; }
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+            }),
+        ),
+      );
+
+      // Dynamic import html-to-image
+      const { toBlob } = await import("html-to-image");
 
       logPerf("export toBlob start", t0);
-      const blob = await toBlob(cardEl, { pixelRatio });
+      const blob = await toBlob(clone, { pixelRatio: 1 });
       logPerf("export toBlob done", t0);
+
+      // Clean up clone
+      document.body.removeChild(clone);
+
       if (!blob) throw new Error("生成图片失败");
 
-      const file = new File([blob], filename, { type: "image/png" });
-
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file] });
-        setIsSaving(false);
-        return;
-      }
-
+      // Always direct browser download — never share
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.download = filename;
@@ -161,35 +161,33 @@ function FarmTemplateCardViewInner({ card, onEdit, onClose }: Props) {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(url), 3000);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
       logPerf("export complete", t0);
+      setIsSaving(false);
     } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") {
-        // user cancelled share — ignore
-      } else {
-        try {
-          const dataUrl = await toPng(cardRef.current, { pixelRatio: 1500 / (cardRef.current?.offsetWidth || 420) });
-          const w = window.open("");
-          if (w) {
-            w.document.write(
-              `<html><body style="margin:0;background:#0b0a08;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;"><img src="${dataUrl}" style="max-width:100%;max-height:90dvh;border-radius:4px;" /><p style="color:#8b8076;font-size:14px;font-family:sans-serif;margin-top:12px;">长按图片保存到相册</p></body></html>`,
-            );
-          } else {
-            setSaveError("弹出窗口被拦截");
-          }
-        } catch {
-          setSaveError("保存失败，请截图保存");
+      // Clean up clone if still present
+      const lingering = document.querySelector('[style*="left: -10000px"]');
+      if (lingering) lingering.remove();
+
+      console.error("[Template] export failed:", e);
+      try {
+        // Fallback: open image in new tab for manual save
+        const { toPng } = await import("html-to-image");
+        const dataUrl = await toPng(cardEl, { pixelRatio: 3 });
+        const w = window.open("");
+        if (w) {
+          w.document.write(
+            `<html><body style="margin:0;background:#0b0a08;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;"><img src="${dataUrl}" style="max-width:100%;max-height:90dvh;border-radius:4px;" /><p style="color:#8b8076;font-size:14px;font-family:sans-serif;margin-top:12px;">长按图片保存到相册</p></body></html>`,
+          );
+        } else {
+          setSaveError("弹出窗口被拦截，请允许弹窗后重试");
         }
-        logPerf("export fallback done", t0);
-      }
-    } finally {
-      // Restore preview background
-      if (swapped && bgImg) {
-        bgImg.src = origSrc;
+      } catch {
+        setSaveError("下载失败，请截图保存");
       }
       setIsSaving(false);
     }
-  }, [filename, previewBg, exportBg]);
+  }, [filename]);
 
   // Template image missing
   if (imageMissing) {

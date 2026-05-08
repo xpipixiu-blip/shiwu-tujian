@@ -126,7 +126,7 @@ export function mapToTemplateModel(data: MockAtlasData): TemplateRenderModel {
     portraitImageUrl: data.croppedImageUrl,
     infoLine1: clampInfoLine1(data.infoFacts),
     statItems: clampStatItems(statItems),
-    bioText: clampBio(`${data.description}\n小知识：${cleanFunFact}`),
+    bioText: clampBio(`${data.description}\n${cleanFunFact}`),
     footerIcons: [
       { icon: "🍓" },
       { icon: "🌱" },

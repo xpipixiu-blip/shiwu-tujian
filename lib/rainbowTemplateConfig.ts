@@ -31,7 +31,7 @@ export const rainbowTemplateConfig: TemplateConfig = {
   slots: {
     name: { x: 380, y: 360, w: 1520, h: 320, padding: { top: 0, right: 40, bottom: 0, left: 40 } },
     badge: { x: 2310, y: 320, w: 440, h: 440 },
-    portrait: { x: 220, y: 830, w: 2755, h: 2580 },
+    portrait: { x: 220, y: 825, w: 2755, h: 2580 },
     portraitInset: { top: 44, right: 44, bottom: 44, left: 44 },
     info1: { x: 280, y: 2490, w: 2400, h: 250, padding: { top: 0, right: 36, bottom: 0, left: 36 } },
     info2: { x: 350, y: 2720, w: 2320, h: 250, padding: { top: 0, right: 36, bottom: 0, left: 36 } },

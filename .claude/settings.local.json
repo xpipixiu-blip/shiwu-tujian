@@ -16,7 +16,10 @@
       "Bash(taskkill //PID 59664 //F)",
       "Bash(node *)",
       "Bash(npm install *)",
-      "Bash(taskkill //PID 59364 //F)"
+      "Bash(taskkill //PID 59364 //F)",
+      "Bash(git push *)",
+      "Bash(gh pr *)",
+      "Bash(ipconfig)"
     ]
   }
 }

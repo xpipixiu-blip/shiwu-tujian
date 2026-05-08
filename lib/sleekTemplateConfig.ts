@@ -31,7 +31,7 @@ export const sleekTemplateConfig: TemplateConfig = {
   slots: {
     name: { x: 380, y: 380, w: 1520, h: 320, padding: { top: 0, right: 40, bottom: 0, left: 40 } },
     badge: { x: 2160, y: 320, w: 440, h: 440 },
-    portrait: { x: 220, y: 862, w: 2775, h: 2470 },
+    portrait: { x: 220, y: 858, w: 2775, h: 2480 },
     portraitInset: { top: 44, right: 44, bottom: 44, left: 44 },
     info1: { x: 280, y: 2440, w: 2400, h: 250, padding: { top: 0, right: 36, bottom: 0, left: 36 } },
     info2: { x: 320, y: 2750, w: 2400, h: 250, padding: { top: 0, right: 36, bottom: 0, left: 36 } },
